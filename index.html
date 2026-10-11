@@ -897,6 +897,7 @@ async function apiPost(body){
     body:JSON.stringify(Object.assign({key:STK.key}, body))});
   let data;
   try{ data = await res.json(); }catch(e){ throw new Error('後端回應格式不對，可能還沒更新成第二階段的程式'); }
+  if(data.error === 'locked') throw new Error('通關碼嘗試次數過多，已暫時鎖定，請 10 分鐘後再試');
   if(data.error === 'passcode'){
     STK.key = ''; STK.inv = null; STK.recs = null;
     try{ localStorage.removeItem(LS_KEY); }catch(e){}
