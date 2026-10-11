@@ -268,7 +268,7 @@ const DEFAULT_PARAMS = {
   met_easy:5, met_mid:6, met_steep:7.5,
   rate_cool:.4, rate_mild:.6, rate_hot:.8, camp_water:1,
   split_b:.25, split_d:.35, split_t:.40, ratio_default:85,
-  gas_per_liter:12, gas_buffer:1.2, can_tare:150,
+  gas_per_liter:14, gas_buffer:1.2, can_tare:150, can_tare_110:105,
   kit_per_people:4, kit_weight:1.3,
   victim_kcal:1000, victim_water:1, load_warn_pct:30,
   protein_gkg:1.4, carb_gkg:6, fat_min_pct:20, fat_max_pct:35, trail_carb_min:30, trail_carb_max:60
@@ -521,8 +521,9 @@ function fuel(hotMl){
   else if(gas <= 90) txt = '110 g 罐 × 1';
   else if(gas <= 200) txt = '230 g 罐 × 1';
   else txt = `230 g 罐 × ${Math.ceil(gas / 210)}`;
-  const cans = gas <= 0 ? 0 : gas <= 200 ? 1 : Math.ceil(gas / 210);
-  return {gas, txt, gross: gas + cans * P.can_tare};
+  /* 空罐重：110 g 罐與 230 g 罐分開算 */
+  const tare = gas <= 0 ? 0 : gas <= 90 ? P.can_tare_110 : gas <= 200 ? P.can_tare : Math.ceil(gas / 210) * P.can_tare;
+  return {gas, txt, gross: gas + tare};
 }
 function waterCalc(mode, plan){
   const c = S[mode], rate = RATE[c.temp];
@@ -764,7 +765,7 @@ function method(){
   <p><b>餐別分配</b> ${T4}<br>早餐 ${Math.round(P.split_b*100)}%、晚餐 ${Math.round(P.split_d*100)}%、行動糧 ${Math.round(P.split_t*100)}%（一天兩餐，午餐以行動糧取代）。這個比例沒有直接文獻，是依「行進中邊走邊補」設計的。</p>
   <p><b>三大營養素</b> ${T1}<br>碳水每天至少 ${P.carb_gkg} g/公斤體重，行進中每小時補 ${P.trail_carb_min}～${P.trail_carb_max} g；蛋白質約 ${P.protein_gkg} g/公斤；脂肪占熱量 ${P.fat_min_pct}～${P.fat_max_pct}%。來自運動營養學會聲明與登山營養綜述。研究也顯示嚴重熱量缺口時，多補蛋白質擋不住肌肉流失，先吃夠熱量更重要。</p>
   <p><b>飲水</b> ${T3}<br>行進中每小時 寒冷 ${P.rate_cool}、溫和 ${P.rate_mild}、炎熱 ${P.rate_hot} L，加營地 ${P.camp_water} L；煮食用水依每項食物需要的水量加總。這幾個數字目前<b>查無可靠研究</b>，是常見經驗值（綜述常提到每小時 0.4～0.8 L，但未附原始研究）。有強證據的是原則：荒野醫學學會（WMS）2019 指引主張依口渴飲水，不要強灌，喝過量是運動性低血鈉的主因。最大背水量 = 每小時飲水 × 最長補水間隔，營地無水時再加營地煮食與夜間用水。</p>
-  <p><b>燃料</b> ${T2}<br>目前設定每公升熱水 ${P.gas_per_liter} g 瓦斯，再乘 ${P.gas_buffer} 倍餘裕。參考：爐具廠商宣稱約 14 g/公升（廠商資料，非獨立實測），一份獨立部落格實測約 17 g/公升，所以這個設定可能偏樂觀。沒有同行評審的研究。寒冷或高海拔要再多帶，常見說法是融雪約需加倍，來源是經驗法則。空罐重 ${P.can_tare} g 是估計，實際 230 g 罐約 145～155 g、110 g 罐約 100～105 g。</p>
+  <p><b>燃料</b> ${T2}<br>目前設定每公升熱水 ${P.gas_per_liter} g 瓦斯，再乘 ${P.gas_buffer} 倍餘裕。參考：爐具廠商宣稱約 14 g/公升（廠商資料，非獨立實測），一份獨立部落格實測約 17 g/公升，所以這個設定可能偏樂觀。沒有同行評審的研究。寒冷或高海拔要再多帶，常見說法是融雪約需加倍，來源是經驗法則。空罐重是估計值：230 g 罐設 ${P.can_tare} g（實際約 145～155 g）、110 g 罐設 ${P.can_tare_110} g（實際約 100～105 g）。</p>
   <p><b>背負警示</b> ${tag('軍方準則', 'mid')}<br>背負占體重超過 ${P.load_warn_pct}% 會標示。30% 與 45% 出自美軍的作戰與行軍負重準則（原文稱為目標，不是絕對限制），<b>不是傷害風險的研究界線</b>。研究指出調整坡度、地形與速度，往往比只減輕重量更能控制強度。重負重、速度快或地形複雜時，常用的負重能耗公式會低估。</p>
   <p><b>配糧規則</b> ${T4}<br>每餐先選一樣主食（每天輪替），再輪流加入配菜或點心，直到接近目標。保存期限較短的食物（御飯糰、三明治、麵包、香腸）只排在前幾天。所有數值都可以在每日菜單中手動調整，或到食物資料庫修改。</p>
   <p class="hint">依據整理自專案資料夾 research 內的文獻整理報告。部分文獻只讀到摘要，台灣高山與溪谷行進的專屬數據目前查無可靠來源。</p>
