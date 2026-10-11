@@ -585,7 +585,7 @@ function renderAside(){
     ${numField(mode,'ratio','熱量準備比例',50,110,5,'%')}
     <p class="hint">多日行程很難吃足消耗量，一般準備消耗的 80–90%。</p>
     ${selField(mode,'spare','預備糧',{0:'不帶',1:'多 1 天',2:'多 2 天'})}
-    ${mode === 'solo' ? numField(mode,'victims','受困者預備人數',0,10,1,'人') + '<p class="hint">每人預估 ${P.victim_kcal} kcal 行動糧與 ${P.victim_water} L 水。</p>' : ''}
+    ${mode === 'solo' ? numField(mode,'victims','受困者預備人數',0,10,1,'人') + `<p class="hint">每人預估 ${P.victim_kcal} kcal 行動糧與 ${P.victim_water} L 水。</p>` : ''}
   </div>
   <div class="panel"><h2>水源</h2>
     ${numField(mode,'refill','最長補水間隔',0,24,.5,'小時')}
@@ -731,7 +731,7 @@ function renderTeam(){
     ${stat('全隊食物重', kg(all.g), 'kg', `公糧 ${kg(shared.g)}・行動糧 ${kg(trail.g)}`)}
     ${stat('每人每日飲水', w.drink.toFixed(1), 'L', `全隊煮食最多 ${w.cookMax.toFixed(1)} L／天`, 'water')}
     ${stat('燃料', fu.gas, 'g', fu.txt)}
-    ${stat('鍋具爐頭', kits, '套', '每 4 人 1 套')}
+    ${stat('鍋具爐頭', kits, '套', `每 ${P.kit_per_people} 人 1 套`)}
     ${stat('預估花費', fmt(all.price), '元', `每人約 ${fmt(all.price / n)} 元`)}
   </div>
   <section class="block"><div class="block-h"><h2>背負分配</h2></div>
