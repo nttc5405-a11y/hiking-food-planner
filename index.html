@@ -1,0 +1,893 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>登山糧食規劃</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDF0EC; --card:#F8FAF7; --ink:#1D2A26; --muted:#5B6964; --line:#C9D2CC;
+  --head:#1F3B33; --head-ink:#EEF3EF;
+  --signal:#D3501B; --signal-soft:#F5DACC; --water:#2C6A99; --water-soft:#D5E4EF;
+  --moss:#4C6D50; --moss-soft:#DAE5D8; --warn:#A86F12; --warn-soft:#F3E4C4;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#131A18; --card:#1B2421; --ink:#E3E9E5; --muted:#98A6A0; --line:#33413C;
+    --head:#0E1513; --head-ink:#E3E9E5;
+    --signal:#F07A45; --signal-soft:#4A2A1C; --water:#72A9D6; --water-soft:#1E3243;
+    --moss:#8DB590; --moss-soft:#22342A; --warn:#E0A84A; --warn-soft:#3E3018; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#131A18; --card:#1B2421; --ink:#E3E9E5; --muted:#98A6A0; --line:#33413C;
+  --head:#0E1513; --head-ink:#E3E9E5;
+  --signal:#F07A45; --signal-soft:#4A2A1C; --water:#72A9D6; --water-soft:#1E3243;
+  --moss:#8DB590; --moss-soft:#22342A; --warn:#E0A84A; --warn-soft:#3E3018; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  line-height:1.6;font-size:15px}
+.num{font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+/* header */
+header{background:var(--head);color:var(--head-ink);position:relative;overflow:hidden}
+header svg.topo{position:absolute;inset:0;width:100%;height:100%;opacity:.13;pointer-events:none}
+.wrap{max-width:1240px;margin:0 auto;padding:0 18px}
+.head-in{position:relative;padding:26px 0 0}
+h1{font-size:clamp(1.6rem,3.6vw,2.3rem);font-weight:900;margin:0;letter-spacing:.04em}
+.lede{margin:4px 0 18px;opacity:.82;max-width:46em}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap}
+nav.tabs button{background:transparent;border:0;color:var(--head-ink);opacity:.7;padding:10px 16px;
+  border-radius:8px 8px 0 0;cursor:pointer;font-weight:700}
+nav.tabs button[aria-selected="true"]{background:var(--paper);color:var(--ink);opacity:1}
+nav.tabs small{font-weight:400;opacity:.75;margin-left:6px}
+
+/* layout */
+.grid{display:grid;grid-template-columns:330px minmax(0,1fr);gap:26px;padding:24px 0 60px}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+aside{align-self:start;position:sticky;top:12px}
+@media (max-width:900px){aside{position:static}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.panel h2{font-size:1rem;margin:0 0 10px}
+.panel + .panel{margin-top:14px}
+.field{display:grid;grid-template-columns:1fr 110px;align-items:center;gap:8px;padding:5px 0}
+.field label{font-size:.92rem}
+.field input[type=number],.field select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper)}
+.field input[type=number]{text-align:right}
+.check{display:flex;gap:8px;align-items:center;padding:5px 0;font-size:.92rem}
+.check input{width:17px;height:17px;accent-color:var(--signal)}
+.hint{font-size:.8rem;color:var(--muted);margin:2px 0 6px}
+.hint.warn{color:var(--warn)}
+hr.sep{border:0;border-top:1px dashed var(--line);margin:10px 0}
+
+/* members */
+.mem{width:100%;border-collapse:collapse;font-size:.88rem}
+.mem th{font-weight:500;color:var(--muted);text-align:left;padding:4px 2px}
+.mem td{padding:3px 2px}
+.mem input{width:100%;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--paper)}
+.mem input[type=number]{text-align:right}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--signal);border-color:var(--signal);color:#fff}
+.btn.sm{padding:2px 8px;font-size:.85rem}
+.x{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:1.1rem;line-height:1}
+
+/* target hero */
+.hero{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.hero-top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 28px}
+.big{font-size:clamp(3rem,7vw,4.6rem);font-weight:700;line-height:.9;color:var(--signal)}
+.big span{font-size:.38em;color:var(--muted);margin-left:4px;font-weight:600}
+.hero-cap{font-size:.9rem;color:var(--muted)}
+.hero-side{display:flex;gap:24px;flex-wrap:wrap}
+.hero-side div{font-size:.85rem;color:var(--muted)}
+.hero-side b{display:block;font-size:1.6rem;color:var(--ink);line-height:1.1}
+.split{display:flex;height:34px;margin-top:16px;border-radius:6px;overflow:hidden;font-size:.82rem}
+.split div{display:flex;align-items:center;justify-content:center;gap:6px;color:#fff;white-space:nowrap;padding:0 6px;min-width:0}
+.split .b{background:var(--moss)} .split .d{background:var(--signal)} .split .t{background:var(--water)}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.stat .l{font-size:.82rem;color:var(--muted)}
+.stat .v{font-size:1.7rem;font-weight:600;line-height:1.15}
+.stat .v small{font-size:.55em;color:var(--muted);margin-left:3px}
+.stat .s{font-size:.78rem;color:var(--muted)}
+.stat.water .v{color:var(--water)}
+
+section.block{margin-top:30px}
+.block-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+.block-h h2{margin:0;font-size:1.25rem}
+.block-h .acts{display:flex;gap:6px;flex-wrap:wrap}
+
+/* day cards */
+.days{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.day{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.day-h{display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px;border-bottom:1px solid var(--line)}
+.day-h h3{margin:0;font-size:1.02rem}
+.day.spare .day-h{background:var(--warn-soft)}
+.day.victim .day-h{background:var(--signal-soft)}
+.day-h .num{color:var(--muted);font-size:1.05rem}
+.slot{padding:10px 14px;border-bottom:1px dashed var(--line)}
+.slot:last-child{border-bottom:0}
+.slot.off{opacity:.5}
+.slot-h{display:flex;align-items:center;gap:8px}
+.slot-h label{display:flex;gap:6px;align-items:center;font-weight:700;cursor:pointer}
+.slot-h input{accent-color:var(--signal)}
+.slot-h .num{margin-left:auto;font-size:1rem}
+.gauge{height:5px;background:var(--line);border-radius:3px;margin:6px 0 6px;position:relative;overflow:hidden}
+.gauge i{position:absolute;inset:0 auto 0 0;border-radius:3px}
+.ok i{background:var(--moss)} .low i{background:var(--signal)} .high i{background:var(--warn)}
+.items{list-style:none;margin:0;padding:0}
+.items li{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:.92rem}
+.items .nm{flex:1;min-width:0}
+.items .nm small{color:var(--muted)}
+.items .q{width:2.2em;text-align:center;font-size:1.05rem}
+.step{width:24px;height:24px;border:1px solid var(--line);border-radius:6px;background:var(--paper);cursor:pointer;line-height:1;padding:0}
+.addsel{margin-top:4px;width:100%;padding:4px 6px;border:1px dashed var(--line);border-radius:6px;background:transparent;color:var(--muted);font-size:.85rem}
+.empty{font-size:.85rem;color:var(--muted)}
+
+/* shopping */
+.shop{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.shop h3{margin:0;padding:8px 14px;font-size:.95rem;background:var(--moss-soft);display:flex;justify-content:space-between}
+.shop h3.pre{background:var(--warn-soft)}
+.shop table{width:100%;border-collapse:collapse;font-size:.92rem}
+.shop td{padding:6px 14px;border-top:1px solid var(--line)}
+.shop td.r{text-align:right;white-space:nowrap}
+.shop tr.done td{color:var(--muted);text-decoration:line-through}
+.shop input{width:17px;height:17px;accent-color:var(--moss);vertical-align:middle}
+.tablewrap{overflow-x:auto}
+.foot{padding:10px 14px;border-top:2px solid var(--ink);display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-weight:700}
+
+/* load table */
+.load{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:.92rem}
+.load th,.load td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.load th:first-child,.load td:first-child{text-align:left}
+.load th{font-weight:500;color:var(--muted);background:var(--paper)}
+.pct{display:inline-block;min-width:3.2em;padding:1px 6px;border-radius:4px}
+.pct.hi{background:var(--signal-soft);color:var(--signal)}
+
+/* food db */
+.db{width:100%;border-collapse:collapse;background:var(--card);font-size:.88rem}
+.db th,.db td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.db th{color:var(--muted);font-weight:500;background:var(--paper);position:sticky;top:0}
+.db input[type=number]{width:64px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--paper);text-align:right}
+.db input[type=text]{width:120px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--paper)}
+.db select{padding:3px 4px;border:1px solid var(--line);border-radius:5px;background:var(--paper)}
+.db tr.off td{opacity:.45}
+.db tr.off td:first-child{opacity:1}
+.chip{display:inline-block;font-size:.75rem;padding:0 6px;border-radius:10px;margin-right:3px;border:1px solid var(--line);cursor:pointer;user-select:none}
+.chip.on.b{background:var(--moss);border-color:var(--moss);color:#fff}
+.chip.on.d{background:var(--signal);border-color:var(--signal);color:#fff}
+.chip.on.t{background:var(--water);border-color:var(--water);color:#fff}
+.dbwrap{border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:70vh}
+
+details.method{margin-top:30px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 18px}
+details.method summary{cursor:pointer;font-weight:700}
+details.method p,details.method li{font-size:.9rem;max-width:72ch}
+details.method code{background:var(--paper);padding:1px 5px;border-radius:4px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 16px;border-radius:8px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+
+@media print{
+  header nav,aside,.acts,.step,.addsel,.x,details.method{display:none!important}
+  header{background:none;color:#000} header svg{display:none}
+  .grid{display:block;padding:0}
+  body{background:#fff;color:#000;font-size:12px}
+  .day,.shop,.hero,.stat{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<header>
+  <svg class="topo" viewBox="0 0 1200 220" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g fill="none" stroke="#fff" stroke-width="1.4">
+      <path d="M-20 190 C180 120 300 210 460 150 S760 60 900 120 1120 170 1240 90"/>
+      <path d="M-20 160 C170 95 310 180 470 120 S760 30 910 90 1120 140 1240 60"/>
+      <path d="M-20 130 C160 70 320 150 480 92 S760 5 920 62 1120 110 1240 30"/>
+      <path d="M-20 100 C150 45 330 120 490 64 S760 -20 930 34 1120 80 1240 2"/>
+      <path d="M620 210 C700 170 800 190 860 150 S980 140 1040 170"/>
+      <path d="M660 220 C730 190 810 205 870 175 S980 165 1030 190"/>
+      <ellipse cx="830" cy="70" rx="60" ry="22"/><ellipse cx="830" cy="70" rx="30" ry="10"/>
+    </g>
+  </svg>
+  <div class="wrap head-in">
+    <h1>登山糧食規劃</h1>
+    <p class="lede">依體重、背負重量與天數估算每日熱量，配出超商、超市買得到的早晚餐與行動糧，並估算飲水、燃料與採購清單。</p>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-act="view" data-v="solo">個人<small>救災出勤</small></button>
+      <button role="tab" data-act="view" data-v="team">整隊<small>山域訓練</small></button>
+      <button role="tab" data-act="view" data-v="db">食物資料庫</button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap"><div class="grid" id="app"></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ---------- 食物資料 ----------
+ slots: b 早餐 / d 晚餐 / t 行動糧
+ scope: solo 個人用、team 團體煮食用、both 兩者皆可
+ water: 沖泡或烹煮需要的水量 (ml)
+ shelf: 建議在出發後第幾天前吃完 */
+const DEFAULT_FOODS = [
+ {id:'b1',name:'菠蘿麵包',unit:'個',g:100,kcal:380,water:0,shelf:3,price:30,store:'超商',slots:['b','t'],main:true,scope:'both',max:2},
+ {id:'b2',name:'奶酥／起酥麵包',unit:'個',g:90,kcal:390,water:0,shelf:3,price:35,store:'超商',slots:['b','t'],main:true,scope:'both',max:2},
+ {id:'b3',name:'白吐司（4 片）',unit:'份',g:120,kcal:320,water:0,shelf:4,price:25,store:'超商',slots:['b'],main:true,scope:'both',max:2},
+ {id:'b4',name:'御飯糰',unit:'個',g:110,kcal:200,water:0,shelf:1,price:32,store:'超商',slots:['b','t'],main:true,scope:'solo',max:2},
+ {id:'b5',name:'三明治',unit:'份',g:130,kcal:310,water:0,shelf:1,price:39,store:'超商',slots:['b'],main:true,scope:'solo',max:2},
+ {id:'b6',name:'即食燕麥片',unit:'包',g:40,kcal:150,water:200,shelf:180,price:10,store:'超市',slots:['b'],main:false,scope:'both',max:2},
+ {id:'b7',name:'三合一麥片',unit:'包',g:30,kcal:125,water:150,shelf:180,price:8,store:'超市',slots:['b'],main:false,scope:'both',max:2},
+ {id:'b8',name:'三合一咖啡',unit:'包',g:15,kcal:70,water:150,shelf:365,price:6,store:'超市',slots:['b'],main:false,scope:'both',max:1},
+ {id:'d1',name:'碗裝泡麵（大碗）',unit:'碗',g:110,kcal:470,water:450,shelf:180,price:35,store:'超商',slots:['d'],main:true,scope:'solo',max:2},
+ {id:'d2',name:'袋裝泡麵',unit:'包',g:85,kcal:380,water:500,shelf:180,price:18,store:'超市',slots:['d'],main:true,scope:'both',max:2},
+ {id:'d3',name:'乾燥飯',unit:'包',g:100,kcal:380,water:160,shelf:365,price:130,store:'預先準備',slots:['d'],main:true,scope:'solo',max:2},
+ {id:'d4',name:'鮪魚罐頭（易開罐）',unit:'罐',g:150,kcal:200,water:0,shelf:365,price:45,store:'超商',slots:['d'],main:false,scope:'both',max:1},
+ {id:'d5',name:'肉醬罐頭',unit:'罐',g:190,kcal:330,water:0,shelf:365,price:40,store:'超市',slots:['d'],main:false,scope:'both',max:1},
+ {id:'d6',name:'沖泡濃湯',unit:'包',g:22,kcal:90,water:200,shelf:365,price:15,store:'超市',slots:['d'],main:false,scope:'both',max:2},
+ {id:'t1',name:'綜合堅果（小包）',unit:'包',g:30,kcal:180,water:0,shelf:180,price:25,store:'超商',slots:['t'],main:false,scope:'both',max:3},
+ {id:'t2',name:'巧克力',unit:'片',g:40,kcal:220,water:0,shelf:180,price:35,store:'超商',slots:['t'],main:false,scope:'both',max:2},
+ {id:'t3',name:'花生巧克力棒',unit:'條',g:50,kcal:245,water:0,shelf:180,price:30,store:'超商',slots:['t'],main:false,scope:'both',max:2},
+ {id:'t4',name:'能量棒',unit:'條',g:40,kcal:180,water:0,shelf:180,price:45,store:'超市',slots:['t'],main:false,scope:'both',max:2},
+ {id:'t5',name:'牛肉乾',unit:'包',g:50,kcal:160,water:0,shelf:60,price:85,store:'超商',slots:['t'],main:false,scope:'both',max:1},
+ {id:'t6',name:'羊羹',unit:'條',g:50,kcal:150,water:0,shelf:180,price:20,store:'超市',slots:['t'],main:false,scope:'both',max:2},
+ {id:'t7',name:'夾心餅乾',unit:'包',g:40,kcal:200,water:0,shelf:180,price:15,store:'超商',slots:['t'],main:false,scope:'both',max:2},
+ {id:'t8',name:'能量果凍',unit:'包',g:180,kcal:180,water:0,shelf:180,price:35,store:'超商',slots:['t'],main:false,scope:'both',max:1},
+ {id:'t9',name:'黑糖塊',unit:'包',g:30,kcal:110,water:0,shelf:365,price:20,store:'超市',slots:['t'],main:false,scope:'both',max:2},
+ {id:'g1',name:'白米（100 g）',unit:'份',g:100,kcal:360,water:150,shelf:365,price:6,store:'超市',slots:['d'],main:true,scope:'team',max:99},
+ {id:'g2',name:'關廟麵（100 g）',unit:'份',g:100,kcal:350,water:300,shelf:180,price:8,store:'超市',slots:['d','b'],main:true,scope:'team',max:99},
+ {id:'g3',name:'燕麥片大包（100 g）',unit:'份',g:100,kcal:380,water:400,shelf:180,price:12,store:'超市',slots:['b'],main:true,scope:'team',max:99},
+ {id:'g4',name:'咖哩調理包',unit:'包',g:200,kcal:220,water:0,shelf:365,price:45,store:'超市',slots:['d'],main:false,scope:'team',max:99},
+ {id:'g5',name:'玉米粒罐頭',unit:'罐',g:340,kcal:250,water:0,shelf:365,price:30,store:'超市',slots:['d','b'],main:false,scope:'team',max:99},
+ {id:'g6',name:'乾燥蔬菜包',unit:'包',g:10,kcal:30,water:100,shelf:180,price:20,store:'超市',slots:['d'],main:false,scope:'team',max:99},
+ {id:'g7',name:'香腸（5 條）',unit:'包',g:250,kcal:750,water:0,shelf:3,price:90,store:'超市',slots:['d','b'],main:false,scope:'team',max:99},
+ {id:'g8',name:'奶粉（30 g）',unit:'份',g:30,kcal:150,water:200,shelf:365,price:8,store:'超市',slots:['b'],main:false,scope:'team',max:99}
+];
+
+/* ---------- 計算參數 ----------
+ 預設值寫在這裡；有連上試算表 params 工作表時，會用試算表的值覆蓋 */
+const DEFAULT_PARAMS = {
+  met_easy:5, met_mid:6, met_steep:7.5,
+  rate_cool:.4, rate_mild:.6, rate_hot:.8, camp_water:1,
+  split_b:.25, split_d:.35, split_t:.40, ratio_default:85,
+  gas_per_liter:12, gas_buffer:1.2, can_tare:150,
+  kit_per_people:4, kit_weight:1.3,
+  victim_kcal:1000, victim_water:1, load_warn_pct:30,
+  protein_gkg:1.4, carb_gkg:6, fat_min_pct:20, fat_max_pct:35, trail_carb_min:30, trail_carb_max:60
+};
+const P = Object.assign({}, DEFAULT_PARAMS);
+const MET = {}, RATE = {}, SPLIT = {};
+function applyParams(src){
+  if(src) for(const k in DEFAULT_PARAMS){
+    const v = parseFloat(src[k]);
+    P[k] = isFinite(v) ? v : DEFAULT_PARAMS[k];
+  }
+  MET.easy = P.met_easy; MET.mid = P.met_mid; MET.steep = P.met_steep;
+  RATE.cool = P.rate_cool; RATE.mild = P.rate_mild; RATE.hot = P.rate_hot;
+  SPLIT.b = P.split_b; SPLIT.d = P.split_d; SPLIT.t = P.split_t;
+}
+applyParams();
+const TERRAIN = {easy:'平緩步道', mid:'一般山徑', steep:'陡上、無路、溪谷'};
+const TEMP = {cool:'寒冷（10°C 以下）', mild:'溫和', hot:'炎熱（25°C 以上）'};
+const SLOTN = {b:'早餐', d:'晚餐', t:'行動糧'};
+const STORES = ['超商','超市','預先準備'];
+const LS = 'hikefood-v1';
+const LS_CLOUD = 'hikefood-cloud-v1';
+
+/* ---------- 試算表連線 ----------
+ 把 Google Apps Script 部署後的網址貼在下面；留空則只用內建預設值 */
+const SHEET_API = 'https://script.google.com/macros/s/AKfycbx9NZDb4TlHhgHvC4aqGxsmL7doXPEsCvFx6ORu5Ddf-P2YAWafCZUmubQeV-AQWE_8-A/exec';
+
+function defaults(){
+  return {
+    view:'solo',
+    foods: JSON.parse(JSON.stringify(BASE_FOODS)),
+    foodsEdited:false, hideNutri:false,
+    solo:{weight:70,load:18,days:3,hours:7,terrain:'mid',temp:'mild',ratio:P.ratio_default,spare:1,victims:0,refill:4,campWater:true,skipFirstB:true,skipLastD:true},
+    team:{days:3,hours:6,terrain:'mid',temp:'mild',ratio:P.ratio_default,spare:0,refill:4,campWater:true,skipFirstB:true,skipLastD:true,
+      members:[{name:'隊員 1',weight:70,gear:14},{name:'隊員 2',weight:65,gear:12},{name:'隊員 3',weight:75,gear:15},{name:'隊員 4',weight:60,gear:11}]},
+    plans:{solo:null,team:null},
+    checked:{}
+  };
+}
+/* BASE_FOODS：目前的「標準食物清單」。先用內建預設，若有試算表快取就用快取，連線成功後再用最新的 */
+let BASE_FOODS = DEFAULT_FOODS;
+let CLOUD = {state: SHEET_API ? 'loading' : 'off', time:null, msg:''};
+try{
+  const r = localStorage.getItem(LS_CLOUD);
+  if(r && SHEET_API){
+    const o = JSON.parse(r);
+    if(Array.isArray(o.foods) && o.foods.length){ BASE_FOODS = o.foods; applyParams(o.params); CLOUD.time = o.time; }
+  }
+}catch(e){}
+let S = defaults();
+try{ const r = localStorage.getItem(LS); if(r){ const o = JSON.parse(r); S = Object.assign(defaults(), o); } }catch(e){}
+function save(){ try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} }
+if(SHEET_API && !S.foodsEdited) S.foods = JSON.parse(JSON.stringify(BASE_FOODS));
+
+/* 把試算表傳來的一列轉成程式用的食物格式，並檢查欄位 */
+function normFood(r){
+  const bool = v => v === true || /^(true|1|y|yes|是|v|✓)$/i.test(String(v).trim());
+  const slots = String(r.slots || '').split(/[,，\s]+/).filter(x => 'bdt'.includes(x) && x);
+  const f = {
+    id:String(r.id || '').trim(), name:String(r.name || '').trim(), unit:String(r.unit || '個').trim(),
+    g:parseFloat(r.g), kcal:parseFloat(r.kcal), water:parseFloat(r.water) || 0, shelf:parseFloat(r.shelf) || 1,
+    price:parseFloat(r.price) || 0, store:String(r.store || '超市').trim(), slots,
+    main:bool(r.main), scope:['solo','team','both'].includes(String(r.scope).trim()) ? String(r.scope).trim() : 'both',
+    max:parseFloat(r.max) || 1, on:r.on === '' || r.on === undefined ? true : bool(r.on)
+  };
+  const nn = v => { if(v === '' || v === null || v === undefined) return null; const x = parseFloat(v); return isFinite(x) && x >= 0 ? x : null; };
+  f.carb = nn(r.carb_g !== undefined ? r.carb_g : r.carb);
+  f.protein = nn(r.protein_g !== undefined ? r.protein_g : r.protein);
+  f.fat = nn(r.fat_g !== undefined ? r.fat_g : r.fat);
+  if(!f.id || !f.name || !(f.g > 0) || !(f.kcal > 0) || !slots.length) return null;
+  return f;
+}
+async function loadCloud(){
+  if(!SHEET_API) return;
+  CLOUD.state = 'loading';
+  try{
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 12000);
+    const res = await fetch(SHEET_API + (SHEET_API.includes('?') ? '&' : '?') + 'type=all', {signal:ctrl.signal});
+    clearTimeout(t);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    const rows = (data.foods || []).map(normFood), foods = rows.filter(Boolean);
+    if(!foods.length) throw new Error('試算表 foods 沒有可用的食物');
+    const skipped = rows.length - foods.length;
+    BASE_FOODS = foods; applyParams(data.params);
+    CLOUD.time = new Date().toISOString(); CLOUD.state = 'ok'; CLOUD.msg = skipped ? `有 ${skipped} 列資料不完整，已略過` : '';
+    try{ localStorage.setItem(LS_CLOUD, JSON.stringify({foods, params:data.params, time:CLOUD.time})); }catch(e){}
+    if(!S.foodsEdited){ S.foods = JSON.parse(JSON.stringify(BASE_FOODS)); }
+    invalidate(); save(); render();
+  }catch(e){
+    CLOUD.state = 'fail'; CLOUD.msg = String(e.message || e);
+    render();
+  }
+}
+
+const $ = s => document.querySelector(s);
+const F = id => S.foods.find(f => f.id === id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Math.round(n).toLocaleString('zh-TW');
+const kg = g => (g/1000).toFixed(2);
+const r10 = n => Math.round(n/10)*10;
+
+/* ---------- 計算 ---------- */
+function needOf(w, load, c){
+  return r10((MET[c.terrain]-1) * (w + load) * c.hours + w * 24);
+}
+function slotTargets(mode){
+  const c = S[mode];
+  const mem = mode === 'solo' ? [{weight:c.weight, gear:c.load}] : c.members;
+  const T = {b:0, d:0, t:0}, per = [];
+  mem.forEach(m => {
+    const tgt = needOf(+m.weight, +m.gear, c) * c.ratio / 100;
+    per.push(tgt);
+    for(const k in SPLIT) T[k] += tgt * SPLIT[k];
+  });
+  for(const k in T) T[k] = r10(T[k]);
+  return {T, per};
+}
+function pool(mode, slot){
+  return S.foods.filter(f => f.on !== false && f.slots.includes(slot) &&
+    (mode === 'solo' || slot === 't' ? f.scope !== 'team' : f.scope !== 'solo'));
+}
+function maxFor(f, mode, n){
+  if(mode === 'solo') return f.max;
+  return f.scope === 'team' ? 999 : f.max * n;
+}
+const rot = (a, k) => a.length ? a.slice(k % a.length).concat(a.slice(0, k % a.length)) : a;
+
+function fill(slot, target, dayNo, mode, n){
+  const c = pool(mode, slot).filter(f => +f.shelf >= dayNo);
+  const items = {}; let kcal = 0;
+  if(!c.length || target <= 0) return items;
+  const goal = target * .97;
+  const can = f => (items[f.id] || 0) < maxFor(f, mode, n);
+  const add = f => { items[f.id] = (items[f.id] || 0) + 1; kcal += +f.kcal; };
+  const mains = c.filter(f => f.main), sides = c.filter(f => !f.main);
+  if(mains.length){
+    const m = mains[(dayNo - 1) % mains.length];
+    const stop = sides.length ? target * .6 : goal;
+    while(kcal < stop && can(m)) add(m);
+  }
+  const cyc = arr => {
+    let prog = true;
+    while(kcal < goal && prog){
+      prog = false;
+      for(const f of arr){ if(kcal >= goal) break; if(can(f)){ add(f); prog = true; } }
+    }
+  };
+  cyc(rot(sides, dayNo - 1));
+  if(kcal < goal) cyc(rot(c, dayNo - 1));
+  return items;
+}
+
+function genPlan(mode){
+  const c = S[mode], n = mode === 'team' ? c.members.length : 1;
+  const {T} = slotTargets(mode);
+  const N = Math.max(1, +c.days), days = [];
+  const mk = (s, on, dayNo) => ({on, target:T[s], items: on ? fill(s, T[s], dayNo, mode, n) : {}});
+  for(let k = 1; k <= N; k++){
+    days.push({kind:'trip', dayNo:k, label:`第 ${k} 天`, slots:{
+      b: mk('b', !(k === 1 && c.skipFirstB), k),
+      t: mk('t', true, k),
+      d: mk('d', !(k === N && c.skipLastD), k)
+    }});
+  }
+  for(let s = 1; s <= +c.spare; s++){
+    days.push({kind:'spare', dayNo:N + s, label:`預備糧 ${s}`, slots:{b:mk('b',true,N+s), t:mk('t',true,N+s), d:mk('d',true,N+s)}});
+  }
+  if(mode === 'solo' && +c.victims > 0){
+    const tg = P.victim_kcal * c.victims;
+    days.push({kind:'victim', dayNo:N, label:`受困者預備（${c.victims} 人）`,
+      slots:{t:{on:true, target:tg, items:fill('t', tg, N, 'solo', 1)}}});
+  }
+  return {days};
+}
+function getPlan(mode){ if(!S.plans[mode]) S.plans[mode] = genPlan(mode); return S.plans[mode]; }
+
+function slotSum(slot){
+  let kcal = 0, g = 0, water = 0, price = 0;
+  if(!slot.on) return {kcal, g, water, price};
+  for(const id in slot.items){
+    const f = F(id), q = slot.items[id]; if(!f || !q) continue;
+    kcal += f.kcal*q; g += f.g*q; water += f.water*q; price += f.price*q;
+  }
+  return {kcal, g, water, price};
+}
+function totals(days, slotsFilter){
+  const t = {kcal:0, g:0, water:0, price:0, qty:{}};
+  days.forEach(d => { for(const s in d.slots){
+    if(slotsFilter && !slotsFilter.includes(s)) continue;
+    const sl = d.slots[s]; if(!sl.on) continue;
+    const x = slotSum(sl); t.kcal += x.kcal; t.g += x.g; t.water += x.water; t.price += x.price;
+    for(const id in sl.items){ if(sl.items[id] > 0) t.qty[id] = (t.qty[id] || 0) + sl.items[id]; }
+  }});
+  return t;
+}
+/* ---------- 三大營養素（選填；食物有填才計算） ---------- */
+const hasN = f => ['carb','protein','fat'].every(k => f[k] !== null && f[k] !== undefined && f[k] !== '' && isFinite(+f[k]));
+function nutri(mode, plan){
+  const c = S[mode], n = mode === 'team' ? c.members.length : 1;
+  const W = mode === 'team' ? c.members.reduce((a, m) => a + (+m.weight || 0), 0) / n : +c.weight;
+  const trip = plan.days.filter(d => d.kind === 'trip');
+  if(!trip.length || !W || !n) return null;
+  let kAll = 0, kKnown = 0, carb = 0, pro = 0, fat = 0, trail = 0;
+  trip.forEach(d => { for(const sk in d.slots){
+    const sl = d.slots[sk]; if(!sl.on) continue;
+    for(const id in sl.items){
+      const f = F(id), q = sl.items[id]; if(!f || !q) continue;
+      kAll += f.kcal * q;
+      if(!hasN(f)) continue;
+      kKnown += f.kcal * q; carb += f.carb * q; pro += f.protein * q; fat += f.fat * q;
+      if(sk === 't') trail += f.carb * q;
+    }
+  }});
+  if(!kAll) return null;
+  const per = x => x / n / trip.length, mk = pro * 4 + carb * 4 + fat * 9;
+  return {W, cover:kKnown / kAll, carb:per(carb), pro:per(pro), fatPct:mk ? fat * 9 / mk * 100 : 0,
+    trailH: per(trail) / (+c.hours || 1)};
+}
+function renderNutri(mode, plan){
+  if(!S.foods.some(hasN)) return '';
+  if(S.hideNutri) return '';
+  const N = nutri(mode, plan); if(!N) return '';
+  const head = `<div class="block-h"><h2>三大營養素（每人每日平均）</h2><div class="acts"><button class="btn" data-act="toggleNutri">隱藏</button></div></div>`;
+  if(N.cover < .95) return `<section class="block">${head}<p class="hint">已填營養素的食物只占菜單熱量的 ${Math.round(N.cover * 100)}%，資料不足所以先不顯示。到「食物資料庫」把碳水、蛋白質、脂肪填完整就會出現。</p></section>`;
+  const cg = N.carb / N.W, pg = N.pro / N.W;
+  const flags = [];
+  if(cg < P.carb_gkg) flags.push(`碳水 ${cg.toFixed(1)} g/kg 低於建議的 ${P.carb_gkg} g/kg，可多配米飯、麵包、麵食、果凍等碳水高的食物`);
+  if(pg < P.protein_gkg) flags.push(`蛋白質 ${pg.toFixed(1)} g/kg 低於 ${P.protein_gkg} g/kg，可加罐頭魚肉、牛肉乾、奶粉`);
+  if(N.fatPct > P.fat_max_pct) flags.push(`脂肪占 ${N.fatPct.toFixed(0)}% 偏高，堅果、巧克力太多時可改配碳水較高的行動糧`);
+  if(N.fatPct < P.fat_min_pct) flags.push(`脂肪占 ${N.fatPct.toFixed(0)}% 偏低`);
+  if(N.trailH < P.trail_carb_min) flags.push(`行動糧每小時約 ${N.trailH.toFixed(0)} g 碳水，低於 ${P.trail_carb_min} g；邊走邊補的量可能不夠`);
+  if(N.trailH > P.trail_carb_max) flags.push(`行動糧每小時約 ${N.trailH.toFixed(0)} g 碳水，高於 ${P.trail_carb_max} g，吃太快容易腸胃不適`);
+  return `<section class="block">${head}
+  <div class="stats">
+    ${stat('碳水', Math.round(N.carb), 'g', `${cg.toFixed(1)} g/kg（建議 ≥ ${P.carb_gkg}）`)}
+    ${stat('蛋白質', Math.round(N.pro), 'g', `${pg.toFixed(1)} g/kg（建議 ${P.protein_gkg} 左右）`)}
+    ${stat('脂肪占熱量', N.fatPct.toFixed(0), '%', `建議 ${P.fat_min_pct}～${P.fat_max_pct}%`)}
+    ${stat('行動糧碳水', N.trailH.toFixed(0), 'g/小時', `建議 ${P.trail_carb_min}～${P.trail_carb_max}`)}
+  </div>
+  ${flags.length ? `<p class="hint warn">提醒：${flags.join('；')}。</p>` : '<p class="hint">各項都在建議範圍內。</p>'}
+  <p class="hint">數字是行程各天的平均（第一天少早餐、最後一天少晚餐也算進去）。建議值整理自運動營養學會聲明與登山營養文獻，屬一般參考，不是醫療建議；詳見專案資料夾 research\營養文獻整理.md。</p></section>`;
+}
+
+function fuel(hotMl){
+  const gas = Math.round(hotMl / 1000 * P.gas_per_liter * P.gas_buffer);
+  let txt;
+  if(gas <= 0) txt = '不需加熱';
+  else if(gas <= 90) txt = '110 g 罐 × 1';
+  else if(gas <= 200) txt = '230 g 罐 × 1';
+  else txt = `230 g 罐 × ${Math.ceil(gas / 210)}`;
+  const cans = gas <= 0 ? 0 : gas <= 200 ? 1 : Math.ceil(gas / 210);
+  return {gas, txt, gross: gas + cans * P.can_tare};
+}
+function waterCalc(mode, plan){
+  const c = S[mode], rate = RATE[c.temp];
+  const trip = plan.days.filter(d => d.kind === 'trip');
+  const cookMax = Math.max(0, ...trip.map(d => totals([d]).water)) / 1000;
+  const drink = rate * c.hours + P.camp_water;
+  return {rate, drink, cookMax};
+}
+
+/* ---------- 畫面 ---------- */
+function render(){
+  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.v === S.view));
+  const app = $('#app');
+  if(S.view === 'db'){ app.style.display = 'block'; app.innerHTML = renderDB(); return; }
+  app.style.display = '';
+  app.innerHTML = `<aside id="aside">${renderAside()}</aside><main id="main"></main>`;
+  renderMain();
+}
+function renderMain(){
+  const m = $('#main'); if(!m) return;
+  m.innerHTML = S.view === 'solo' ? renderSolo() : renderTeam();
+  save();
+}
+
+function numField(mode, k, label, min, max, step, unit){
+  return `<div class="field"><label for="f-${k}">${label}${unit ? `（${unit}）` : ''}</label>
+    <input id="f-${k}" type="number" inputmode="decimal" min="${min}" max="${max}" step="${step}" data-k="${mode}.${k}" value="${S[mode][k]}"></div>`;
+}
+function selField(mode, k, label, opts){
+  return `<div class="field"><label for="f-${k}">${label}</label><select id="f-${k}" data-k="${mode}.${k}">
+    ${Object.entries(opts).map(([v, t]) => `<option value="${v}" ${S[mode][k] == v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+}
+function chkField(mode, k, label){
+  return `<label class="check"><input type="checkbox" data-k="${mode}.${k}" ${S[mode][k] ? 'checked' : ''}>${label}</label>`;
+}
+function renderAside(){
+  const mode = S.view, c = S[mode];
+  let h = '';
+  if(mode === 'solo'){
+    h += `<div class="panel"><h2>個人資料</h2>
+      ${numField(mode,'weight','體重',30,150,1,'kg')}
+      ${numField(mode,'load','背負總重',0,60,1,'kg')}
+      <p class="hint">背包含裝備、糧食與水的預估總重。</p></div>`;
+  } else {
+    h += `<div class="panel"><h2>隊員（${c.members.length} 人）</h2>
+      <table class="mem"><thead><tr><th>姓名</th><th>體重 kg</th><th>裝備 kg</th><th></th></tr></thead><tbody>
+      ${c.members.map((m, i) => `<tr>
+        <td><input type="text" data-m="${i}.name" value="${esc(m.name)}" aria-label="姓名"></td>
+        <td><input type="number" data-m="${i}.weight" value="${m.weight}" min="30" max="150" aria-label="體重"></td>
+        <td><input type="number" data-m="${i}.gear" value="${m.gear}" min="0" max="50" aria-label="個人裝備重"></td>
+        <td><button class="x" data-act="delMember" data-i="${i}" aria-label="移除 ${esc(m.name)}">×</button></td></tr>`).join('')}
+      </tbody></table>
+      <p class="hint">裝備重不含糧食與飲水，公糧會自動分配。</p>
+      <button class="btn sm" data-act="addMember">新增隊員</button></div>`;
+  }
+  h += `<div class="panel"><h2>行程</h2>
+    ${numField(mode,'days','行程天數',1,10,1,'天')}
+    ${numField(mode,'hours','每日行進',1,16,.5,'小時')}
+    ${selField(mode,'terrain','路況',TERRAIN)}
+    ${selField(mode,'temp','氣溫',TEMP)}
+    ${chkField(mode,'skipFirstB','出發日早餐在山下吃')}
+    ${chkField(mode,'skipLastD','最後一天晚餐在山下吃')}
+    <hr class="sep">
+    ${numField(mode,'ratio','熱量準備比例',50,110,5,'%')}
+    <p class="hint">多日行程很難吃足消耗量，一般準備消耗的 80–90%。</p>
+    ${selField(mode,'spare','預備糧',{0:'不帶',1:'多 1 天',2:'多 2 天'})}
+    ${mode === 'solo' ? numField(mode,'victims','受困者預備人數',0,10,1,'人') + '<p class="hint">每人預估 ${P.victim_kcal} kcal 行動糧與 ${P.victim_water} L 水。</p>' : ''}
+  </div>
+  <div class="panel"><h2>水源</h2>
+    ${numField(mode,'refill','最長補水間隔',0,24,.5,'小時')}
+    ${chkField(mode,'campWater','營地有水源')}
+  </div>`;
+  return h;
+}
+
+function hero(need, tgt, needLabel){
+  return `<div class="hero">
+    <div class="hero-top">
+      <div><div class="hero-cap">每人每日準備目標</div>
+        <div class="big num">${fmt(tgt)}<span>kcal</span></div></div>
+      <div class="hero-side">
+        <div>${needLabel}<b class="num">${fmt(need)}</b></div>
+      </div>
+    </div>
+    <div class="split" aria-label="三餐熱量分配">
+      ${['b','d','t'].map(k => `<div class="${k}" style="flex:${SPLIT[k]}">${SLOTN[k]} <span class="num">${fmt(tgt*SPLIT[k])}</span></div>`).join('')}
+    </div></div>`;
+}
+function stat(l, v, unit, s, cls){
+  return `<div class="stat ${cls || ''}"><div class="l">${l}</div><div class="v num">${v}<small>${unit}</small></div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
+}
+
+function renderDays(mode, plan){
+  const n = mode === 'team' ? S.team.members.length : 1;
+  return `<div class="days">${plan.days.map((d, di) => {
+    const dt = totals([d]);
+    const order = ['b','t','d'].filter(s => d.slots[s]);
+    return `<article class="day ${d.kind}">
+      <div class="day-h"><h3>${esc(d.label)}</h3><span class="num">${fmt(dt.kcal)} kcal・${kg(dt.g)} kg</span></div>
+      ${order.map(s => {
+        const sl = d.slots[s], x = slotSum(sl);
+        const r = sl.target ? x.kcal / sl.target : 0;
+        const cls = r < .9 ? 'low' : r > 1.15 ? 'high' : 'ok';
+        const cands = pool(mode, s);
+        const label = s === 't' && mode === 'team' ? '行動糧（全隊）' : (mode === 'team' ? SLOTN[s] + '（公糧）' : SLOTN[s]);
+        return `<div class="slot ${sl.on ? '' : 'off'}">
+          <div class="slot-h"><label><input type="checkbox" data-act="toggleSlot" data-d="${di}" data-s="${s}" ${sl.on ? 'checked' : ''}>${label}</label>
+            ${sl.on ? `<span class="num">${fmt(x.kcal)} / ${fmt(sl.target)}</span>` : '<span class="empty" style="margin-left:auto">不準備</span>'}</div>
+          ${sl.on ? `<div class="gauge ${cls}"><i style="width:${Math.min(100, r*100)}%"></i></div>
+          <ul class="items">${Object.keys(sl.items).filter(id => sl.items[id] > 0 && F(id)).map(id => {
+            const f = F(id);
+            const warn = +f.shelf < d.dayNo && d.kind !== 'victim' ? ' <small style="color:var(--signal)">保存期限不足</small>' : '';
+            return `<li><span class="nm">${esc(f.name)}${warn}</span>
+              <button class="step" data-act="dec" data-d="${di}" data-s="${s}" data-id="${id}" aria-label="減少 ${esc(f.name)}">−</button>
+              <span class="q num">${sl.items[id]}</span>
+              <button class="step" data-act="inc" data-d="${di}" data-s="${s}" data-id="${id}" aria-label="增加 ${esc(f.name)}">+</button></li>`;
+          }).join('') || '<li class="empty">沒有符合的食物，請到食物資料庫啟用品項。</li>'}</ul>
+          <select class="addsel" data-act="addItem" data-d="${di}" data-s="${s}" aria-label="加入食物">
+            <option value="">＋ 加入食物</option>
+            ${cands.map(f => `<option value="${f.id}">${esc(f.name)}（${f.kcal} kcal）</option>`).join('')}
+          </select>` : ''}
+        </div>`;
+      }).join('')}
+    </article>`;
+  }).join('')}</div>`;
+}
+
+function renderShop(mode, plan, extraFoot){
+  const t = totals(plan.days);
+  const rows = {}; STORES.forEach(s => rows[s] = []);
+  Object.keys(t.qty).forEach(id => { const f = F(id); if(f) (rows[f.store] || (rows[f.store] = [])).push(f); });
+  let h = '<div class="shop">';
+  Object.keys(rows).forEach(st => {
+    if(!rows[st].length) return;
+    const sub = rows[st].reduce((a, f) => a + f.price * t.qty[f.id], 0);
+    h += `<h3 class="${st === '預先準備' ? 'pre' : ''}"><span>${st}${st === '預先準備' ? '（登山用品店、網購或單位儲備）' : ''}</span><span class="num">NT$ ${fmt(sub)}</span></h3>
+      <div class="tablewrap"><table>${rows[st].sort((a, b) => a.id.localeCompare(b.id)).map(f => {
+        const key = mode + ':' + f.id, done = S.checked[key];
+        return `<tr class="${done ? 'done' : ''}"><td style="width:28px"><input type="checkbox" data-act="check" data-key="${key}" ${done ? 'checked' : ''} aria-label="已買 ${esc(f.name)}"></td>
+          <td>${esc(f.name)}${+f.shelf <= 1 ? ' <small style="color:var(--muted)">出發當天買</small>' : ''}</td>
+          <td class="r num">${t.qty[f.id]} ${esc(f.unit)}</td><td class="r num">${kg(f.g * t.qty[f.id])} kg</td><td class="r num">$${fmt(f.price * t.qty[f.id])}</td></tr>`;
+      }).join('')}</table></div>`;
+  });
+  h += `<div class="foot"><span>食物合計 <span class="num">${kg(t.g)} kg</span></span>${extraFoot || ''}<span>約 <span class="num">NT$ ${fmt(t.price)}</span></span></div></div>`;
+  return h;
+}
+
+function renderSolo(){
+  const c = S.solo, plan = getPlan('solo');
+  const need = needOf(+c.weight, +c.load, c), tgt = need * c.ratio / 100;
+  const trip = plan.days.filter(d => d.kind === 'trip');
+  const all = totals(plan.days), tripT = totals(trip);
+  const w = waterCalc('solo', plan);
+  const hot = totals(plan.days.filter(d => d.kind !== 'victim')).water;
+  const fu = fuel(hot);
+  const carry = w.rate * c.refill + (c.campWater ? 0 : w.cookMax + P.camp_water) + (+c.victims || 0) * P.victim_water;
+  return `${hero(need, tgt, '每日消耗估算')}
+  <div class="stats">
+    ${stat('全程食物重', kg(all.g), 'kg', `行程中每日約 ${kg(tripT.g / trip.length)} kg`)}
+    ${stat('熱量密度', all.g ? (all.kcal / all.g).toFixed(1) : '0', 'kcal/g', '4 以上算輕量')}
+    ${stat('每日需水', (w.drink + w.cookMax).toFixed(1), 'L', `飲用 ${w.drink.toFixed(1)}＋煮食 ${w.cookMax.toFixed(1)}`, 'water')}
+    ${stat('最大背水量', carry.toFixed(1), 'L', c.campWater ? '依補水間隔估算' : '含營地煮食與夜間用水', 'water')}
+    ${stat('燃料', fu.gas, 'g', fu.txt)}
+    ${stat('預估花費', fmt(all.price), '元', '')}
+  </div>
+  ${renderNutri('solo', plan)}
+  <section class="block"><div class="block-h"><h2>逐日菜單</h2>
+    <div class="acts"><button class="btn" data-act="regen">重新配糧</button></div></div>
+    ${renderDays('solo', plan)}</section>
+  <section class="block"><div class="block-h"><h2>採購清單</h2>
+    <div class="acts"><button class="btn" data-act="copy">複製文字（LINE）</button><button class="btn" data-act="print">列印</button></div></div>
+    ${renderShop('solo', plan)}</section>
+  ${method()}`;
+}
+
+function distribute(members, base, E){
+  let lo = 0, hi = 3;
+  const f = r => members.reduce((a, m, i) => a + Math.max(0, r * m.weight - base[i]), 0);
+  if(E <= 0) return members.map(() => 0);
+  for(let k = 0; k < 60; k++){ const mid = (lo + hi) / 2; if(f(mid) < E) lo = mid; else hi = mid; }
+  return members.map((m, i) => Math.max(0, hi * m.weight - base[i]));
+}
+
+function renderTeam(){
+  const c = S.team, plan = getPlan('team'), n = c.members.length;
+  if(!n) return '<div class="panel">請先新增隊員。</div>';
+  const {per} = slotTargets('team');
+  const needs = c.members.map(m => needOf(+m.weight, +m.gear, c));
+  const avgNeed = needs.reduce((a, b) => a + b, 0) / n;
+  const avgTgt = per.reduce((a, b) => a + b, 0) / n;
+  const all = totals(plan.days), shared = totals(plan.days, ['b','d']), trail = totals(plan.days, ['t']);
+  const w = waterCalc('team', plan);
+  const fu = fuel(all.water);
+  const kits = Math.ceil(n / P.kit_per_people);
+  const sharedKg = (shared.g + fu.gross) / 1000 + kits * P.kit_weight + (c.campWater ? 0 : w.cookMax + n * P.camp_water);
+  const sumPer = per.reduce((a, b) => a + b, 0);
+  const trailEach = per.map(p => trail.g / 1000 * p / sumPer);
+  const waterEach = w.rate * c.refill;
+  const base = c.members.map((m, i) => +m.gear + trailEach[i] + waterEach);
+  const share = distribute(c.members.map(m => ({weight:+m.weight})), base, sharedKg);
+  const loadRows = c.members.map((m, i) => {
+    const tot = base[i] + share[i], pct = tot / m.weight * 100;
+    return `<tr><td>${esc(m.name)}</td><td class="num">${fmt(needs[i])}</td><td class="num">${(+m.gear).toFixed(1)}</td><td class="num">${trailEach[i].toFixed(1)}</td>
+      <td class="num">${waterEach.toFixed(1)}</td><td class="num">${share[i].toFixed(1)}</td><td class="num"><b>${tot.toFixed(1)}</b></td>
+      <td><span class="pct num ${pct > P.load_warn_pct ? 'hi' : ''}">${pct.toFixed(0)}%</span></td></tr>`;
+  }).join('');
+  return `${hero(avgNeed, avgTgt, '平均每日消耗')}
+  <div class="stats">
+    ${stat('全隊每日目標', fmt(sumPer), 'kcal', `${n} 人合計`)}
+    ${stat('全隊食物重', kg(all.g), 'kg', `公糧 ${kg(shared.g)}・行動糧 ${kg(trail.g)}`)}
+    ${stat('每人每日飲水', w.drink.toFixed(1), 'L', `全隊煮食最多 ${w.cookMax.toFixed(1)} L／天`, 'water')}
+    ${stat('燃料', fu.gas, 'g', fu.txt)}
+    ${stat('鍋具爐頭', kits, '套', '每 4 人 1 套')}
+    ${stat('預估花費', fmt(all.price), '元', `每人約 ${fmt(all.price / n)} 元`)}
+  </div>
+  <section class="block"><div class="block-h"><h2>背負分配</h2></div>
+    <p class="hint">公糧、燃料、鍋具${c.campWater ? '' : '與營地用水'}共 ${sharedKg.toFixed(1)} kg，依體重比例分給較輕的人，讓每人背負占體重的比例接近。超過 ${P.load_warn_pct}% 會標示。</p>
+    <div class="tablewrap"><table class="load"><thead><tr><th>隊員</th><th>每日消耗</th><th>裝備</th><th>行動糧</th><th>飲水</th><th>公糧分攤</th><th>總重 kg</th><th>占體重</th></tr></thead>
+    <tbody>${loadRows}</tbody></table></div></section>
+  ${renderNutri('team', plan)}
+  <section class="block"><div class="block-h"><h2>逐日菜單</h2>
+    <div class="acts"><button class="btn" data-act="regen">重新配糧</button></div></div>
+    ${renderDays('team', plan)}</section>
+  <section class="block"><div class="block-h"><h2>採購清單（統一採購）</h2>
+    <div class="acts"><button class="btn" data-act="copy">複製文字（LINE）</button><button class="btn" data-act="print">列印</button></div></div>
+    ${renderShop('team', plan)}</section>
+  ${method()}`;
+}
+
+function method(){
+  return `<details class="method"><summary>計算方式</summary>
+  <p><b>每日消耗</b>：<code>(MET − 1) × (體重 + 背負重) × 行進時數 + 體重 × 24</code>。後項是全天的基礎消耗（約 1 kcal/kg/小時），前項是行進額外消耗。MET 依路況取 平緩 ${P.met_easy}、一般 ${P.met_mid}、陡上無路 ${P.met_steep}。整隊模式以個人裝備重代入背負重。</p>
+  <p><b>準備目標</b>：消耗 × 熱量準備比例，再依 早餐 ${Math.round(P.split_b*100)}%、晚餐 ${Math.round(P.split_d*100)}%、行動糧 ${Math.round(P.split_t*100)}% 分配（一天兩餐，午餐以行動糧取代）。</p>
+  <p><b>飲水</b>：行進中每小時 寒冷 ${P.rate_cool}、溫和 ${P.rate_mild}、炎熱 ${P.rate_hot} L，加營地 ${P.camp_water} L；煮食用水依每項食物需要的水量加總。最大背水量 = 每小時飲水 × 最長補水間隔，營地無水時再加營地煮食與夜間用水。</p>
+  <p><b>燃料</b>：每公升熱水約 ${P.gas_per_liter} g 瓦斯，再乘 ${P.gas_buffer} 倍餘裕。寒冷或高海拔要再多帶。</p>
+  <p><b>配糧</b>：每餐先選一樣主食（每天輪替），再輪流加入配菜或點心，直到接近目標。保存期限較短的食物（御飯糰、三明治、麵包、香腸）只排在前幾天。所有數值都可以在每日菜單中手動調整，或到食物資料庫修改。</p>
+  </details>`;
+}
+
+/* ---------- 食物資料庫 ---------- */
+function cloudNote(){
+  if(!SHEET_API) return '<p class="hint">目前使用程式內建的食物資料，尚未連接試算表。</p>';
+  const t = CLOUD.time ? new Date(CLOUD.time).toLocaleString('zh-TW', {hour12:false}) : '';
+  let m;
+  if(CLOUD.state === 'loading') m = '正在從試算表載入…';
+  else if(CLOUD.state === 'ok') m = `已從試算表載入（${t}）${CLOUD.msg ? '。' + CLOUD.msg : ''}`;
+  else m = `無法連線試算表（${esc(CLOUD.msg)}），${t ? '改用上次載入的資料（' + t + '）' : '改用程式內建資料'}`;
+  const edited = S.foodsEdited ? '　<b>此裝置上的食物有手動修改，不會被試算表覆蓋。</b>要長期修改請改試算表。' : '';
+  return `<p class="hint ${CLOUD.state === 'fail' ? 'warn' : ''}">${m}${edited}</p>`;
+}
+function renderDB(){
+  return `<div class="block-h"><h2>食物資料庫</h2>
+    <div class="acts"><button class="btn" data-act="addFood">新增食物</button><button class="btn" data-act="toggleNutri">${S.hideNutri ? '顯示營養素' : '隱藏營養素'}</button>${SHEET_API ? '<button class="btn" data-act="reloadCloud">從試算表重新載入</button>' : ''}<button class="btn" data-act="resetFoods">${SHEET_API ? '放棄修改' : '恢復預設'}</button></div></div>
+  ${cloudNote()}
+  <p class="hint">取消勾選的食物不會被自動配入。點選早／晚／行切換可用的餐別。數值是一般市售品的估計，請依實際包裝修正。</p>
+  <div class="dbwrap"><table class="db"><thead><tr>
+    <th>使用</th><th>名稱</th><th>單位</th><th>重量 g</th><th>熱量 kcal</th>${S.hideNutri ? '' : '<th>碳水 g</th><th>蛋白質 g</th><th>脂肪 g</th>'}<th>kcal/g</th><th>需水 ml</th><th>可放天數</th><th>價格</th><th>購買</th><th>餐別</th><th>主食</th><th>適用</th><th></th></tr></thead>
+  <tbody>${S.foods.map((f, i) => `<tr class="${f.on === false ? 'off' : ''}">
+    <td><input type="checkbox" data-f="${i}.on" ${f.on === false ? '' : 'checked'} aria-label="使用 ${esc(f.name)}"></td>
+    <td><input type="text" data-f="${i}.name" value="${esc(f.name)}"></td>
+    <td><input type="text" data-f="${i}.unit" value="${esc(f.unit)}" style="width:40px"></td>
+    <td><input type="number" data-f="${i}.g" value="${f.g}"></td>
+    <td><input type="number" data-f="${i}.kcal" value="${f.kcal}"></td>
+    ${S.hideNutri ? '' : ['carb','protein','fat'].map(k => `<td><input type="number" min="0" step="0.1" data-f="${i}.${k}" value="${f[k] == null ? '' : f[k]}" placeholder="—" style="width:56px" aria-label="${k}"></td>`).join('')}
+    <td class="num">${(f.kcal / f.g).toFixed(1)}</td>
+    <td><input type="number" data-f="${i}.water" value="${f.water}"></td>
+    <td><input type="number" data-f="${i}.shelf" value="${f.shelf}"></td>
+    <td><input type="number" data-f="${i}.price" value="${f.price}"></td>
+    <td><select data-f="${i}.store">${STORES.map(s => `<option ${f.store === s ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
+    <td>${['b','d','t'].map(s => `<span class="chip ${s} ${f.slots.includes(s) ? 'on' : ''}" data-act="slotChip" data-i="${i}" data-s="${s}" role="button" tabindex="0">${{b:'早',d:'晚',t:'行'}[s]}</span>`).join('')}</td>
+    <td><input type="checkbox" data-f="${i}.main" ${f.main ? 'checked' : ''} aria-label="主食"></td>
+    <td><select data-f="${i}.scope">${Object.entries({both:'皆可',solo:'個人',team:'整隊'}).map(([v, t]) => `<option value="${v}" ${f.scope === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
+    <td><button class="x" data-act="delFood" data-i="${i}" aria-label="刪除 ${esc(f.name)}">×</button></td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ---------- 事件 ---------- */
+function invalidate(){ S.plans = {solo:null, team:null}; }
+function toast(t){ const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 1800); }
+
+document.addEventListener('change', e => {
+  const el = e.target;
+  if(el.dataset.k){
+    const [mode, k] = el.dataset.k.split('.');
+    let v = el.type === 'checkbox' ? el.checked : el.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
+    if(el.tagName === 'SELECT' && /^\d+$/.test(v)) v = +v;
+    if(k === 'days') v = Math.max(1, Math.min(10, Math.round(v)));
+    S[mode][k] = v; S.plans[mode] = null; renderMain(); return;
+  }
+  if(el.dataset.m){
+    const [i, k] = el.dataset.m.split('.');
+    S.team.members[i][k] = el.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
+    S.plans.team = null; renderMain(); return;
+  }
+  if(el.dataset.f){
+    const [i, k] = el.dataset.f.split('.');
+    const f = S.foods[i];
+    if(k === 'carb' || k === 'protein' || k === 'fat') f[k] = el.value === '' ? null : Math.max(0, parseFloat(el.value) || 0);
+    else f[k] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
+    S.foodsEdited = true; invalidate(); save(); render(); return;
+  }
+  if(el.dataset.act === 'addItem' && el.value){
+    const sl = getPlan(S.view).days[el.dataset.d].slots[el.dataset.s];
+    sl.items[el.value] = (sl.items[el.value] || 0) + 1; renderMain(); return;
+  }
+  if(el.dataset.act === 'toggleSlot'){
+    const mode = S.view, d = getPlan(mode).days[el.dataset.d], sl = d.slots[el.dataset.s];
+    sl.on = el.checked;
+    sl.items = sl.on ? fill(el.dataset.s, sl.target, d.dayNo, mode, mode === 'team' ? S.team.members.length : 1) : {};
+    renderMain(); return;
+  }
+  if(el.dataset.act === 'check'){ S.checked[el.dataset.key] = el.checked; el.closest('tr').classList.toggle('done', el.checked); save(); }
+});
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if(!el) return;
+  const a = el.dataset.act;
+  if(a === 'view'){ S.view = el.dataset.v; save(); render(); }
+  else if(a === 'inc' || a === 'dec'){
+    const sl = getPlan(S.view).days[el.dataset.d].slots[el.dataset.s], id = el.dataset.id;
+    sl.items[id] = Math.max(0, (sl.items[id] || 0) + (a === 'inc' ? 1 : -1));
+    if(!sl.items[id]) delete sl.items[id];
+    renderMain();
+  }
+  else if(a === 'regen'){ S.plans[S.view] = null; renderMain(); toast('已依目前設定重新配糧'); }
+  else if(a === 'addMember'){ const n = S.team.members.length + 1; S.team.members.push({name:`隊員 ${n}`, weight:65, gear:12}); S.plans.team = null; render(); }
+  else if(a === 'delMember'){ S.team.members.splice(+el.dataset.i, 1); S.plans.team = null; render(); }
+  else if(a === 'print'){ window.print(); }
+  else if(a === 'copy'){ copyText(); }
+  else if(a === 'slotChip'){
+    const f = S.foods[+el.dataset.i], s = el.dataset.s;
+    f.slots = f.slots.includes(s) ? f.slots.filter(x => x !== s) : f.slots.concat(s);
+    S.foodsEdited = true; invalidate(); save(); render();
+  }
+  else if(a === 'delFood'){ const f = S.foods[+el.dataset.i]; if(confirm(`刪除「${f.name}」？`)){ S.foods.splice(+el.dataset.i, 1); S.foodsEdited = true; invalidate(); save(); render(); } }
+  else if(a === 'addFood'){
+    S.foods.push({id:'u' + Date.now().toString(36), name:'新食物', unit:'個', g:50, kcal:200, water:0, shelf:30, price:30, store:'超商', slots:['t'], main:false, scope:'both', max:2});
+    S.foodsEdited = true; invalidate(); save(); render();
+    const inputs = document.querySelectorAll('.db tbody tr:last-child input[type=text]'); if(inputs[0]){ inputs[0].focus(); inputs[0].select(); }
+  }
+  else if(a === 'resetFoods'){ if(confirm(SHEET_API ? '放棄此裝置上的修改，回到試算表的食物資料？' : '恢復預設食物資料庫？自訂的食物會被移除。')){ S.foods = JSON.parse(JSON.stringify(BASE_FOODS)); S.foodsEdited = false; invalidate(); save(); render(); } }
+  else if(a === 'toggleNutri'){ S.hideNutri = !S.hideNutri; save(); render(); }
+  else if(a === 'reloadCloud'){ if(!S.foodsEdited || confirm('重新載入會蓋掉此裝置上手動修改的食物資料，確定？')){ S.foodsEdited = false; loadCloud(); } }
+});
+document.addEventListener('keydown', e => { if((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('chip')){ e.preventDefault(); e.target.click(); } });
+
+function copyText(){
+  const mode = S.view, c = S[mode], plan = getPlan(mode), t = totals(plan.days);
+  const head = mode === 'solo'
+    ? `【登山糧食採購清單】個人・${c.days} 天${c.spare ? `＋預備 ${c.spare} 天` : ''}${c.victims ? `・受困者預備 ${c.victims} 人` : ''}`
+    : `【登山糧食採購清單】整隊 ${c.members.length} 人・${c.days} 天${c.spare ? `＋預備 ${c.spare} 天` : ''}`;
+  let out = head + '\n';
+  STORES.forEach(st => {
+    const fs = Object.keys(t.qty).map(F).filter(f => f && f.store === st);
+    if(!fs.length) return;
+    out += `\n＜${st}＞\n` + fs.map(f => `□ ${f.name} ×${t.qty[f.id]} ${f.unit}`).join('\n') + '\n';
+  });
+  out += `\n食物合計 ${kg(t.g)} kg，約 NT$ ${fmt(t.price)}`;
+  const done = () => toast('已複製採購清單');
+  if(navigator.clipboard && window.isSecureContext){ navigator.clipboard.writeText(out).then(done, () => fallback(out, done)); }
+  else fallback(out, done);
+}
+function fallback(txt, cb){
+  const ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); cb(); }catch(e){ toast('無法複製，請手動選取'); }
+  ta.remove();
+}
+
+render();
+loadCloud();
+</script>
+</body>
+</html>
