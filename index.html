@@ -574,20 +574,21 @@ function nutri(mode, plan){
   const W = mode === 'team' ? c.members.reduce((a, m) => a + (+m.weight || 0), 0) / n : +c.weight;
   const trip = plan.days.filter(d => d.kind === 'trip');
   if(!trip.length || !W || !n) return null;
-  let kAll = 0, kKnown = 0, carb = 0, pro = 0, fat = 0, trail = 0;
+  let kAll = 0, kKnown = 0, carb = 0, pro = 0, fat = 0, trail = 0; const miss = {};
   trip.forEach(d => { for(const sk in d.slots){
     const sl = d.slots[sk]; if(!sl.on) continue;
     for(const id in sl.items){
       const f = F(id), q = sl.items[id]; if(!f || !q) continue;
       kAll += f.kcal * q;
-      if(!hasN(f)) continue;
+      if(!hasN(f)){ miss[id] = (miss[id] || 0) + f.kcal * q; continue; }
       kKnown += f.kcal * q; carb += f.carb * q; pro += f.protein * q; fat += f.fat * q;
       if(sk === 't') trail += f.carb * q;
     }
   }});
   if(!kAll) return null;
   const per = x => x / n / trip.length, mk = pro * 4 + carb * 4 + fat * 9;
-  return {W, cover:kKnown / kAll, carb:per(carb), pro:per(pro), fatPct:mk ? fat * 9 / mk * 100 : 0,
+  const missing = Object.entries(miss).sort((a, b) => b[1] - a[1]).map(([id]) => F(id).name);
+  return {W, missing, cover:kKnown / kAll, carb:per(carb), pro:per(pro), fatPct:mk ? fat * 9 / mk * 100 : 0,
     trailH: per(trail) / (+c.hours || 1)};
 }
 function renderNutri(mode, plan){
@@ -595,23 +596,29 @@ function renderNutri(mode, plan){
   if(S.hideNutri) return '';
   const N = nutri(mode, plan); if(!N) return '';
   const head = `<div class="block-h"><h2>三大營養素（每人每日平均）</h2><div class="acts"><button class="btn" data-act="toggleNutri">隱藏</button></div></div>`;
-  if(N.cover < .95) return `<section class="block">${head}<p class="hint">已填營養素的食物只占菜單熱量的 ${Math.round(N.cover * 100)}%，資料不足所以先不顯示。到「食物資料庫」把碳水、蛋白質、脂肪填完整就會出現。</p></section>`;
+  const pct = Math.round(N.cover * 100), partial = N.cover < .95;
+  if(N.cover <= 0) return `<section class="block">${head}<p class="hint">這份菜單用到的食物都還沒填營養素（碳水、蛋白質、脂肪），所以算不出來。到「食物資料庫」填一些就會出現。</p></section>`;
+  const missTxt = N.missing.length ? `還沒填：${N.missing.slice(0, 6).map(esc).join('、')}${N.missing.length > 6 ? ` 等 ${N.missing.length} 項` : ''}。` : '';
+  const cover = partial ? `<p class="hint warn"><b>只計算已填營養素的食物，涵蓋這份菜單熱量的 ${pct}%。</b>實際的碳水、蛋白質、脂肪會比下面的數字高，所以先不提醒「太低」。${missTxt}填完整就能看到完整的檢查。</p>` : `<p class="hint">已填營養素的食物涵蓋這份菜單熱量的 ${pct}%。${missTxt}</p>`;
   const cg = N.carb / N.W, pg = N.pro / N.W;
   const flags = [];
+  if(!partial){
   if(cg < P.carb_gkg) flags.push(`碳水 ${cg.toFixed(1)} g/kg 低於建議的 ${P.carb_gkg} g/kg，可多配米飯、麵包、麵食、果凍等碳水高的食物`);
   if(pg < P.protein_gkg) flags.push(`蛋白質 ${pg.toFixed(1)} g/kg 低於 ${P.protein_gkg} g/kg，可加罐頭魚肉、牛肉乾、奶粉`);
   if(N.fatPct > P.fat_max_pct) flags.push(`脂肪占 ${N.fatPct.toFixed(0)}% 偏高，堅果、巧克力太多時可改配碳水較高的行動糧`);
   if(N.fatPct < P.fat_min_pct) flags.push(`脂肪占 ${N.fatPct.toFixed(0)}% 偏低`);
   if(N.trailH < P.trail_carb_min) flags.push(`行動糧每小時約 ${N.trailH.toFixed(0)} g 碳水，低於 ${P.trail_carb_min} g；邊走邊補的量可能不夠`);
   if(N.trailH > P.trail_carb_max) flags.push(`行動糧每小時約 ${N.trailH.toFixed(0)} g 碳水，高於 ${P.trail_carb_max} g，吃太快容易腸胃不適`);
+  }
   return `<section class="block">${head}
+  ${cover}
   <div class="stats">
-    ${stat('碳水', Math.round(N.carb), 'g', `${cg.toFixed(1)} g/kg（建議 ≥ ${P.carb_gkg}）`)}
-    ${stat('蛋白質', Math.round(N.pro), 'g', `${pg.toFixed(1)} g/kg（建議 ${P.protein_gkg} 左右）`)}
-    ${stat('脂肪占熱量', N.fatPct.toFixed(0), '%', `建議 ${P.fat_min_pct}～${P.fat_max_pct}%`)}
-    ${stat('行動糧碳水', N.trailH.toFixed(0), 'g/小時', `建議 ${P.trail_carb_min}～${P.trail_carb_max}`)}
+    ${stat('碳水', Math.round(N.carb), 'g', partial ? `${cg.toFixed(1)} g/kg（僅已填部分）` : `${cg.toFixed(1)} g/kg（建議 ≥ ${P.carb_gkg}）`)}
+    ${stat('蛋白質', Math.round(N.pro), 'g', partial ? `${pg.toFixed(1)} g/kg（僅已填部分）` : `${pg.toFixed(1)} g/kg（建議 ${P.protein_gkg} 左右）`)}
+    ${stat('脂肪占熱量', N.fatPct.toFixed(0), '%', partial ? '僅已填部分的比例' : `建議 ${P.fat_min_pct}～${P.fat_max_pct}%`)}
+    ${stat('行動糧碳水', N.trailH.toFixed(0), 'g/小時', partial ? '僅已填部分' : `建議 ${P.trail_carb_min}～${P.trail_carb_max}`)}
   </div>
-  ${flags.length ? `<p class="hint warn">提醒：${flags.join('；')}。</p>` : '<p class="hint">各項都在建議範圍內。</p>'}
+  ${partial ? '' : flags.length ? `<p class="hint warn">提醒：${flags.join('；')}。</p>` : '<p class="hint">各項都在建議範圍內。</p>'}
   <p class="hint">數字是行程各天的平均（第一天少早餐、最後一天少晚餐也算進去）。建議值整理自運動營養學會聲明與登山營養文獻，屬一般參考，不是醫療建議；詳見專案資料夾 research\營養文獻整理.md。</p></section>`;
 }
 
@@ -864,7 +871,7 @@ function method(){
   平緩與山徑：2024 年運動活動分類表（Compendium）的無負重步行約 5.3、越野健行約 6.0，與設定接近。陡上無路：7.5 對應該表「負重 9～18 公斤、坡度 3～10% 爬坡」，條件比真正陡上、無路緩和，同表較陡的條件是 10.0，所以這個路況可能偏低。體重 × 24 是常用的全天基礎消耗近似值，${tag('經驗值', 'low')}。拿高山遠征實測（約 3,250～4,640 kcal/天）與軍事行軍實測（約 5,480～6,851 kcal/天）比，公式結果落在偏高端，但仍有明顯誤差，請當作估計。</p>
   <p><b>準備量</b> ${T2}<br>消耗 × 熱量準備比例（預設 ${P.ratio_default}%）。遠征實測常只吃到需求的 50～70%，但短期的熱量缺口對腿部表現影響很小，所以 5 天內準備八成多合理。行程 6 天以上或海拔 3,000 公尺以上，建議背包內仍備 90% 以上，並多帶好入口的食物。</p>
   <p><b>餐別分配</b> ${T4}<br>早餐 ${Math.round(P.split_b*100)}%、晚餐 ${Math.round(P.split_d*100)}%、行動糧 ${Math.round(P.split_t*100)}%（一天兩餐，午餐以行動糧取代）。這個比例沒有直接文獻，是依「行進中邊走邊補」設計的。</p>
-  <p><b>三大營養素</b> ${T1}<br>碳水每天至少 ${P.carb_gkg} g/公斤體重，行進中每小時補 ${P.trail_carb_min}～${P.trail_carb_max} g；蛋白質約 ${P.protein_gkg} g/公斤；脂肪占熱量 ${P.fat_min_pct}～${P.fat_max_pct}%。來自運動營養學會聲明與登山營養綜述。研究也顯示嚴重熱量缺口時，多補蛋白質擋不住肌肉流失，先吃夠熱量更重要。</p>
+  <p><b>三大營養素</b> ${T1}<br>碳水每天至少 ${P.carb_gkg} g/公斤體重，行進中每小時補 ${P.trail_carb_min}～${P.trail_carb_max} g；蛋白質約 ${P.protein_gkg} g/公斤；脂肪占熱量 ${P.fat_min_pct}～${P.fat_max_pct}%。來自運動營養學會聲明與登山營養綜述。研究也顯示嚴重熱量缺口時，多補蛋白質擋不住肌肉流失，先吃夠熱量更重要。食物的營養素沒填完整時，只計算已填的部分並標明涵蓋比例，不會拿不完整的數字做「太低」的提醒。</p>
   <p><b>飲水</b> ${T3}<br>行進中每小時 寒冷 ${P.rate_cool}、溫和 ${P.rate_mild}、炎熱 ${P.rate_hot} L，加營地 ${P.camp_water} L；煮食用水依每項食物需要的水量加總。這幾個數字目前<b>查無可靠研究</b>，是常見經驗值（綜述常提到每小時 0.4～0.8 L，但未附原始研究）。有強證據的是原則：荒野醫學學會（WMS）2019 指引主張依口渴飲水，不要強灌，喝過量是運動性低血鈉的主因。最大背水量 = 每小時飲水 × 最長補水間隔，營地無水時再加營地煮食與夜間用水。</p>
   <p><b>燃料</b> ${T2}<br>目前設定每公升熱水 ${P.gas_per_liter} g 瓦斯，再乘 ${P.gas_buffer} 倍餘裕。參考：爐具廠商宣稱約 14 g/公升（廠商資料，非獨立實測），一份獨立部落格實測約 17 g/公升，所以這個設定可能偏樂觀。沒有同行評審的研究。寒冷或高海拔要再多帶，常見說法是融雪約需加倍，來源是經驗法則。空罐重是估計值：230 g 罐設 ${P.can_tare} g（實際約 145～155 g）、110 g 罐設 ${P.can_tare_110} g（實際約 100～105 g）。</p>
   <p><b>背負警示</b> ${tag('軍方準則', 'mid')}<br>背負占體重超過 ${P.load_warn_pct}% 會標示。30% 與 45% 出自美軍的作戰與行軍負重準則（原文稱為目標，不是絕對限制），<b>不是傷害風險的研究界線</b>。研究指出調整坡度、地形與速度，往往比只減輕重量更能控制強度。重負重、速度快或地形複雜時，常用的負重能耗公式會低估。</p>
