@@ -131,7 +131,9 @@ section.block{margin-top:30px}
 .items li{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:.92rem}
 .items .nm{flex:1;min-width:0}
 .items .nm small{color:var(--muted)}
-.items .q{width:2.2em;text-align:center;font-size:1.05rem}
+.items .q{min-width:3.6em;text-align:center;font-size:1.05rem;white-space:nowrap}
+.items .q small{font-size:.78rem;color:var(--muted);margin-left:2px;font-family:inherit;font-weight:400}
+.items .nm .per{display:block;font-size:.76rem;color:var(--muted)}
 .step{width:24px;height:24px;border:1px solid var(--line);border-radius:6px;background:var(--paper);cursor:pointer;line-height:1;padding:0}
 .addsel{margin-top:4px;width:100%;padding:4px 6px;border:1px dashed var(--line);border-radius:6px;background:transparent;color:var(--muted);font-size:.85rem}
 .empty{font-size:.85rem;color:var(--muted)}
@@ -631,14 +633,14 @@ function renderDays(mode, plan){
           <ul class="items">${Object.keys(sl.items).filter(id => sl.items[id] > 0 && F(id)).map(id => {
             const f = F(id);
             const warn = +f.shelf < d.dayNo && d.kind !== 'victim' ? ' <small style="color:var(--signal)">保存期限不足</small>' : '';
-            return `<li><span class="nm">${esc(f.name)}${warn}</span>
+            return `<li><span class="nm">${esc(f.name)}${warn}<span class="per">每${esc(f.unit)} ${fmt(f.kcal)} kcal・${fmt(f.g)} g</span></span>
               <button class="step" data-act="dec" data-d="${di}" data-s="${s}" data-id="${id}" aria-label="減少 ${esc(f.name)}">−</button>
-              <span class="q num">${sl.items[id]}</span>
+              <span class="q"><span class="num">${sl.items[id]}</span><small>${esc(f.unit)}</small></span>
               <button class="step" data-act="inc" data-d="${di}" data-s="${s}" data-id="${id}" aria-label="增加 ${esc(f.name)}">+</button></li>`;
           }).join('') || '<li class="empty">沒有符合的食物，請到食物資料庫啟用品項。</li>'}</ul>
           <select class="addsel" data-act="addItem" data-d="${di}" data-s="${s}" aria-label="加入食物">
             <option value="">＋ 加入食物</option>
-            ${cands.map(f => `<option value="${f.id}">${esc(f.name)}（${f.kcal} kcal）</option>`).join('')}
+            ${cands.map(f => `<option value="${f.id}">${esc(f.name)}（每${esc(f.unit)} ${f.kcal} kcal）</option>`).join('')}
           </select>` : ''}
         </div>`;
       }).join('')}
