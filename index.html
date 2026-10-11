@@ -253,6 +253,11 @@ details.method code{background:var(--paper);padding:1px 5px;border-radius:4px}
   .db td.delcell .x{min-width:40px;min-height:40px;font-size:1.4rem}
   .db td.num{font-size:1.05rem;align-self:end}
 }
+/* 標題圖示與頁尾 */
+h1{display:flex;align-items:center;gap:12px}
+h1 .logo{width:1.35em;height:1.35em;flex:none;border-radius:22%}
+.site-foot{border-top:1px solid var(--line);margin-top:8px;padding:18px 0 calc(28px + env(safe-area-inset-bottom,0px));color:var(--muted);font-size:.9rem;text-align:center}
+.site-foot a{color:var(--water);font-weight:700;text-decoration:underline;text-underline-offset:3px;padding:4px 2px}
 /* 拍照辨識 */
 .photo-box{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin:6px 0 12px;background:var(--paper)}
 .btn.disabled{opacity:.5;pointer-events:none}
@@ -288,7 +293,7 @@ details.method code{background:var(--paper);padding:1px 5px;border-radius:4px}
   </svg>
   <div class="wrap head-in">
     <button class="theme-btn" data-act="theme" aria-pressed="false" aria-label="切換白天高對比模式"></button>
-    <h1>登山糧食規劃</h1>
+    <h1><img class="logo" src="icon.svg" width="44" height="44" alt="">登山糧食規劃</h1>
     <p class="lede">依體重、背負重量與天數估算每日熱量，配出超商、超市買得到的早晚餐與行動糧，並估算飲水、燃料與採購清單。</p>
     <nav class="tabs" role="tablist">
       <button role="tab" data-act="view" data-v="solo">個人<small>救災出勤</small></button>
@@ -300,6 +305,7 @@ details.method code{background:var(--paper);padding:1px 5px;border-radius:4px}
 </header>
 
 <div class="wrap"><div class="grid" id="app"></div></div>
+<footer class="site-foot"><div class="wrap">內容相關疑問或建議，請洽<a href="mailto:nttc5405@gmail.com">沈翔</a></div></footer>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
