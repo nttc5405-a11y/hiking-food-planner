@@ -886,6 +886,7 @@ function renderDB(){
 
 /* ---------- 庫存與紀錄（第二階段，需通關碼） ---------- */
 const LS_KEY = 'hikefood-key-v1', LS_LAST = 'hikefood-lastdeduct-v1';
+const PASSCODE_HINT = '區碼局電';   // 通關碼提示（顯示在輸入框旁；網頁是公開的，任何人都看得到）
 const STK = {key:'', inv:null, recs:null, loading:false, busy:false, err:'', mode:'solo', loc:'',
   form:{type:'訓練', note:'', date:''}, editing:'', edit:{}};
 try{ STK.key = localStorage.getItem(LS_KEY) || ''; }catch(e){}
@@ -955,7 +956,7 @@ function renderStock(){
   const head = `<div class="block-h"><h2>庫存與紀錄</h2><div class="acts">${STK.key
     ? '<button class="btn" data-act="stockReload">重新載入</button><button class="btn" data-act="stockLogout">登出</button>' : ''}</div></div>`;
   if(!STK.key) return head + `<div class="panel"><p>庫存與紀錄需要通關碼（在試算表的 Apps Script 執行 setup 時會顯示）。通關碼只存在這台裝置的瀏覽器裡。</p>
-    <div class="field"><label for="stk-key">通關碼</label><input id="stk-key" type="password" autocomplete="off"></div>
+    <div class="field"><label for="stk-key">通關碼</label><input id="stk-key" type="password" autocomplete="off"><p class="hint" style="margin:4px 0 0">提示：${esc(PASSCODE_HINT)}</p></div>
     <p><button class="btn primary" data-act="stockLogin">進入</button></p>
     ${STK.err ? `<p class="hint warn">${esc(STK.err)}</p>` : ''}</div>`;
   if(STK.err) return head + `<p class="hint warn">${esc(STK.err)}</p><p class="hint">若剛更新過後端，請確認 Apps Script 已「部署新版本」，並已執行過 setup。</p>`;
@@ -1259,7 +1260,7 @@ function renderFoodForm(){
     </div>
     <p style="margin:10px 0 4px"><b>適合哪一餐</b>　${['b', 'd', 't'].map(k => `<label class="check" style="display:inline-flex;margin-right:12px"><input type="checkbox" data-nf-slot="${k}" ${v.slots.includes(k) ? 'checked' : ''}>${SLOTN[k]}</label>`).join('')}
       <label class="check" style="display:inline-flex"><input type="checkbox" data-nf="main" ${v.main ? 'checked' : ''}>是主食（每餐會先選一樣主食）</label></p>
-    ${STK.key ? '' : `<div class="field" style="max-width:220px"><label for="nf-key">通關碼</label><input id="nf-key" type="password" autocomplete="off" data-nf="key" value="${esc(v.key)}"></div>`}
+    ${STK.key ? '' : `<div class="field" style="max-width:220px"><label for="nf-key">通關碼</label><input id="nf-key" type="password" autocomplete="off" data-nf="key" value="${esc(v.key)}"><p class="hint" style="margin:4px 0 0">提示：${esc(PASSCODE_HINT)}</p></div>`}
     ${DBF.err ? `<p class="hint warn">${esc(DBF.err)}</p>` : ''}
     <p><button class="btn primary" data-act="foodFormSave" ${DBF.busy ? 'disabled' : ''}>${DBF.busy ? '儲存中…' : '儲存到試算表'}</button>
     <button class="btn" data-act="foodFormCancel">取消</button></p></div>`;
