@@ -209,6 +209,7 @@ details.method code{background:var(--paper);padding:1px 5px;border-radius:4px}
       <button role="tab" data-act="view" data-v="solo">個人<small>救災出勤</small></button>
       <button role="tab" data-act="view" data-v="team">整隊<small>山域訓練</small></button>
       <button role="tab" data-act="view" data-v="db">食物資料庫</button>
+      <button role="tab" data-act="view" data-v="stock">庫存與紀錄</button>
     </nav>
   </div>
 </header>
@@ -531,6 +532,7 @@ function render(){
   document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.v === S.view));
   const app = $('#app');
   if(S.view === 'db'){ app.style.display = 'block'; app.innerHTML = renderDB(); return; }
+  if(S.view === 'stock'){ app.style.display = 'block'; app.innerHTML = renderStock(); stockAuto(); return; }
   app.style.display = '';
   app.innerHTML = `<aside id="aside">${renderAside()}</aside><main id="main"></main>`;
   renderMain();
@@ -792,6 +794,201 @@ function renderDB(){
     <td><button class="x" data-act="delFood" data-i="${i}" aria-label="刪除 ${esc(f.name)}">×</button></td>
   </tr>`).join('')}</tbody></table></div>`;
 }
+
+/* ---------- 庫存與紀錄（第二階段，需通關碼） ---------- */
+const LS_KEY = 'hikefood-key-v1', LS_LAST = 'hikefood-lastdeduct-v1';
+const STK = {key:'', inv:null, recs:null, loading:false, busy:false, err:'', mode:'solo', loc:'',
+  form:{type:'訓練', note:'', date:''}, editing:'', edit:{}};
+try{ STK.key = localStorage.getItem(LS_KEY) || ''; }catch(e){}
+const rid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const todayStr = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+
+async function apiPost(body){
+  const res = await fetch(SHEET_API, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(Object.assign({key:STK.key}, body))});
+  let data;
+  try{ data = await res.json(); }catch(e){ throw new Error('後端回應格式不對，可能還沒更新成第二階段的程式'); }
+  if(data.error === 'passcode'){
+    STK.key = ''; STK.inv = null; STK.recs = null;
+    try{ localStorage.removeItem(LS_KEY); }catch(e){}
+    throw new Error('通關碼不正確，請重新輸入');
+  }
+  if(data.error) throw new Error(data.error);
+  return data;
+}
+async function loadStock(){
+  if(!SHEET_API || !STK.key || STK.loading) return;
+  STK.loading = true; STK.err = ''; render();
+  try{
+    const [a, b] = await Promise.all([apiPost({action:'inventory'}), apiPost({action:'records', limit:30})]);
+    STK.inv = a.inventory; STK.recs = b.records;
+  }catch(e){ STK.err = e.message; }
+  STK.loading = false; if(S.view === 'stock') render();
+}
+/* 執行一個會改動後端的動作；結束後清掉快取，讓畫面重新載入最新資料 */
+async function stockRun(fn, okMsg){
+  if(STK.busy) return; STK.busy = true;
+  try{ await fn(); if(okMsg) toast(okMsg); }
+  catch(e){ toast('失敗：' + e.message); }
+  STK.busy = false;
+  if(STK.key){ STK.err = ''; STK.inv = null; STK.recs = null; }
+  render();
+}
+
+function stockRows(){
+  const need = totals(getPlan(STK.mode).days).qty;
+  const by = {};
+  (STK.inv || []).filter(x => !STK.loc || x.location === STK.loc).forEach(x => {
+    const b = by[x.food_id] || (by[x.food_id] = {qty:0, exp:''});
+    b.qty += x.qty;
+    if(x.qty > 0 && x.expiry && (!b.exp || x.expiry < b.exp)) b.exp = x.expiry;
+  });
+  return [...new Set([...Object.keys(need), ...Object.keys(by)])].map(id => {
+    const f = F(id);
+    return {id, name:f ? f.name : `${id}（食物資料庫沒有這個代碼）`, unit:f ? f.unit : '',
+      need:need[id] || 0, have:by[id] ? by[id].qty : 0, exp:by[id] ? by[id].exp : ''};
+  }).sort((a, b) => (b.need > 0) - (a.need > 0) || a.name.localeCompare(b.name, 'zh-TW'));
+}
+function daysLeft(exp){ return Math.floor((new Date(exp) - new Date(todayStr())) / 864e5); }
+
+function planSummary(mode){
+  const c = S[mode], plan = getPlan(mode), n = mode === 'team' ? c.members.length : 1;
+  const trip = plan.days.filter(d => d.kind === 'trip'), t = totals(plan.days), tt = totals(trip);
+  const gas = fuel(totals(plan.days.filter(d => d.kind !== 'victim')).water).gas;
+  return {mode:mode === 'team' ? '整隊' : '個人', people:n, days:+c.days, terrain:TERRAIN[c.terrain], temp:TEMP[c.temp],
+    planned_kcal:Math.round(tt.kcal / n / Math.max(1, trip.length)), gas_planned:gas,
+    plan_items:Object.entries(t.qty).map(([id, q]) => `${F(id) ? F(id).name : id}×${q}`).join('、')};
+}
+
+function renderStock(){
+  if(!SHEET_API) return '<div class="panel">尚未連接試算表，無法使用庫存與紀錄。</div>';
+  const head = `<div class="block-h"><h2>庫存與紀錄</h2><div class="acts">${STK.key
+    ? '<button class="btn" data-act="stockReload">重新載入</button><button class="btn" data-act="stockLogout">登出</button>' : ''}</div></div>`;
+  if(!STK.key) return head + `<div class="panel"><p>庫存與紀錄需要通關碼（在試算表的 Apps Script 執行 setup 時會顯示）。通關碼只存在這台裝置的瀏覽器裡。</p>
+    <div class="field"><label for="stk-key">通關碼</label><input id="stk-key" type="password" autocomplete="off"></div>
+    <p><button class="btn primary" data-act="stockLogin">進入</button></p>
+    ${STK.err ? `<p class="hint warn">${esc(STK.err)}</p>` : ''}</div>`;
+  if(STK.err) return head + `<p class="hint warn">${esc(STK.err)}</p><p class="hint">若剛更新過後端，請確認 Apps Script 已「部署新版本」，並已執行過 setup。</p>`;
+  if(STK.loading || !STK.inv) return head + '<p class="hint">載入中…</p>';
+
+  const locs = [...new Set(STK.inv.map(x => x.location).filter(Boolean))];
+  const rows = stockRows();
+  const last = (() => { try{ return JSON.parse(localStorage.getItem(LS_LAST) || 'null'); }catch(e){ return null; } })();
+  const table = rows.length ? `<div class="dbwrap"><table class="db"><thead><tr><th>食物</th><th>這次需要</th><th>庫存</th><th>差額</th><th>最近期限</th></tr></thead><tbody>
+    ${rows.map(r => {
+      const diff = r.have - r.need, dl = r.exp ? daysLeft(r.exp) : null;
+      return `<tr><td>${esc(r.name)}</td><td class="num">${r.need ? r.need + ' ' + esc(r.unit) : '—'}</td><td class="num">${r.have} ${esc(r.unit)}</td>
+        <td class="num" style="${r.need && diff < 0 ? 'color:var(--signal);font-weight:700' : ''}">${r.need ? (diff < 0 ? `缺 ${-diff}` : `餘 ${diff}`) : ''}</td>
+        <td class="num" style="${dl !== null && dl < 30 ? 'color:var(--signal);font-weight:700' : ''}">${r.exp ? esc(r.exp) + (dl < 0 ? '（已過期）' : dl < 30 ? `（${dl} 天）` : '') : ''}</td></tr>`;
+    }).join('')}</tbody></table></div>` : '<p class="hint">庫存是空的，也沒有這次的菜單。到試算表的 inventory 工作表填入庫存。</p>';
+  const sel = (k, opts, cur) => `<select data-sk="${k}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+  const sm = planSummary(STK.mode), f = STK.form;
+  const recs = (STK.recs || []).map(r => {
+    const done = r.food_left || r.water_enough || r.gas_used !== '';
+    const ed = STK.editing === r.record_id;
+    return `<tr><td>${esc(r.date)}</td><td>${esc(r.type)}</td><td>${esc(r.mode)}・${esc(r.people)} 人・${esc(r.days)} 天</td><td class="num">${esc(r.planned_kcal)}</td>
+      <td>${ed ? `<div style="display:grid;gap:6px;min-width:190px">
+        <select data-se="food_left">${['', '吃完', '剩約 1/4', '剩約 1/2', '剩 3/4 以上'].map(v => `<option ${STK.edit.food_left === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <select data-se="water_enough">${['', '足夠', '勉強', '不夠'].map(v => `<option ${STK.edit.water_enough === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <input type="number" min="0" data-se="gas_used" placeholder="瓦斯實際用量 g" value="${esc(STK.edit.gas_used)}">
+        <input type="text" maxlength="200" data-se="note" placeholder="備註（勿填姓名）" value="${esc(STK.edit.note)}">
+        <span><button class="btn sm primary" data-act="stockSaveEdit" data-id="${esc(r.record_id)}">儲存</button> <button class="btn sm" data-act="stockCancelEdit">取消</button></span></div>`
+      : done ? `食物：${esc(r.food_left || '—')}；水：${esc(r.water_enough || '—')}；瓦斯 ${r.gas_used === '' ? '—' : esc(r.gas_used) + ' g'}${r.note ? '；' + esc(r.note) : ''}
+          <button class="btn sm" data-act="stockEdit" data-id="${esc(r.record_id)}">修改</button>`
+      : `<button class="btn sm" data-act="stockEdit" data-id="${esc(r.record_id)}">補填結果</button>`}</td></tr>`;
+  }).join('');
+  return `${head}
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:0 0 10px">
+    <div class="field"><label>用哪一份菜單比對</label>${sel('mode', [['solo', '個人模式'], ['team', '整隊模式']], STK.mode)}</div>
+    <div class="field"><label>庫存地點</label>${sel('loc', [['', '全部'], ...locs.map(l => [l, l])], STK.loc)}</div></div>
+  <section class="block"><div class="block-h"><h2>庫存對照</h2><div class="acts">
+    <button class="btn primary" data-act="stockDeduct">扣除這次用量</button>
+    ${last ? `<button class="btn" data-act="stockUndo">復原上次扣除</button>` : ''}</div></div>
+  ${table}
+  <p class="hint">需要的數量來自「${STK.mode === 'team' ? '整隊' : '個人'}」分頁目前的菜單。庫存有多筆時，期限近的先扣。要增減庫存請直接改試算表 inventory 工作表。</p></section>
+  <section class="block"><div class="block-h"><h2>記錄這次行程</h2></div>
+  <div class="panel"><p class="hint">會記錄：${esc(sm.mode)}、${sm.people} 人、${sm.days} 天、${esc(sm.terrain)}、${esc(sm.temp)}、每人每日約 ${sm.planned_kcal} kcal、預估瓦斯 ${sm.gas_planned} g。</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding:0">
+      <div class="field"><label for="sf-date">日期</label><input id="sf-date" type="date" data-sf="date" value="${esc(f.date || todayStr())}"></div>
+      <div class="field"><label for="sf-type">類型</label><select id="sf-type" data-sf="type">${['訓練', '出勤'].map(v => `<option ${f.type === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div class="field"><label for="sf-note">備註（勿填姓名）</label><input id="sf-note" type="text" maxlength="200" data-sf="note" value="${esc(f.note)}"></div></div>
+    <p><button class="btn primary" data-act="stockSaveRecord">儲存到紀錄</button></p></div></section>
+  <section class="block"><div class="block-h"><h2>最近紀錄</h2></div>
+  ${recs ? `<div class="dbwrap"><table class="db"><thead><tr><th>日期</th><th>類型</th><th>內容</th><th>計畫 kcal/人日</th><th>結果</th></tr></thead><tbody>${recs}</tbody></table></div>`
+    : '<p class="hint">還沒有紀錄。行程結束後回來「補填結果」，累積的實際用量可以用來校正瓦斯、飲水等參數。</p>'}</section>`;
+}
+
+async function stockDeduct(){
+  const rows = stockRows().filter(r => r.need > 0 && r.have > 0);
+  if(!rows.length){ toast('庫存裡沒有這次需要的食物'); return; }
+  const items = rows.map(r => ({food_id:r.id, qty:Math.min(r.need, r.have)}));
+  const lines = rows.map(r => `${r.name}　−${Math.min(r.need, r.have)} ${r.unit}`).join('\n');
+  if(!confirm(`要從庫存${STK.loc ? '（' + STK.loc + '）' : '（全部地點）'}扣除以下項目嗎？\n\n${lines}\n\n扣錯了可以按「復原上次扣除」。`)) return;
+  const id = rid('D');
+  await stockRun(async () => {
+    const r = await apiPost({action:'deduct', request_id:id, location:STK.loc, items});
+    try{ localStorage.setItem(LS_LAST, JSON.stringify({id, time:Date.now()})); }catch(e){}
+    if(r.shortages && r.shortages.length) alert('已扣除，但這些庫存不足，只扣到有的部分：\n' + r.shortages.map(s => `${F(s.food_id) ? F(s.food_id).name : s.food_id} 少 ${s.short}`).join('\n'));
+  }, '已扣除庫存');
+}
+async function stockUndo(){
+  let last = null; try{ last = JSON.parse(localStorage.getItem(LS_LAST) || 'null'); }catch(e){}
+  if(!last) return;
+  if(!confirm('要復原上一次的庫存扣除嗎？扣掉的數量會加回原本那幾筆。')) return;
+  await stockRun(async () => {
+    await apiPost({action:'undoDeduct', request_id:last.id});
+    try{ localStorage.removeItem(LS_LAST); }catch(e){}
+  }, '已復原');
+}
+async function stockSaveRecord(){
+  const s = planSummary(STK.mode), f = STK.form;
+  await stockRun(async () => {
+    await apiPost(Object.assign({action:'record', request_id:rid('R'), date:f.date || todayStr(), type:f.type, note:f.note}, s));
+    STK.form.note = '';
+  }, '已儲存紀錄');
+}
+async function stockSaveEdit(id){
+  const e = STK.edit;
+  await stockRun(async () => {
+    await apiPost({action:'updateRecord', record_id:id, food_left:e.food_left || '', water_enough:e.water_enough || '',
+      gas_used:e.gas_used === '' || e.gas_used === undefined ? '' : e.gas_used, note:e.note || ''});
+    STK.editing = '';
+  }, '已儲存結果');
+}
+function stockAuto(){ if(STK.key && !STK.inv && !STK.loading && !STK.err) loadStock(); }
+
+document.addEventListener('input', e => {
+  const el = e.target;
+  if(el.dataset.sf) STK.form[el.dataset.sf] = el.value;
+  else if(el.dataset.se) STK.edit[el.dataset.se] = el.value;
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if(el.dataset.sk){ STK[el.dataset.sk] = el.value; render(); }
+});
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if(!el || !el.dataset.act.startsWith('stock')) return;
+  const a = el.dataset.act;
+  if(a === 'stockLogin'){
+    const v = ($('#stk-key') || {}).value || '';
+    if(!v.trim()){ toast('請輸入通關碼'); return; }
+    STK.key = v.trim(); STK.err = ''; STK.inv = null;
+    try{ localStorage.setItem(LS_KEY, STK.key); }catch(x){}
+    render();
+  }
+  else if(a === 'stockLogout'){ STK.key = ''; STK.inv = null; STK.recs = null; STK.err = ''; try{ localStorage.removeItem(LS_KEY); }catch(x){} render(); }
+  else if(a === 'stockReload'){ STK.err = ''; STK.inv = null; STK.recs = null; STK.loading = false; render(); }
+  else if(a === 'stockDeduct') stockDeduct();
+  else if(a === 'stockUndo') stockUndo();
+  else if(a === 'stockSaveRecord') stockSaveRecord();
+  else if(a === 'stockEdit'){
+    const r = (STK.recs || []).find(x => x.record_id === el.dataset.id) || {};
+    STK.editing = el.dataset.id; STK.edit = {food_left:r.food_left || '', water_enough:r.water_enough || '', gas_used:r.gas_used === undefined ? '' : r.gas_used, note:r.note || ''};
+    render();
+  }
+  else if(a === 'stockCancelEdit'){ STK.editing = ''; render(); }
+  else if(a === 'stockSaveEdit') stockSaveEdit(el.dataset.id);
+});
 
 /* ---------- 事件 ---------- */
 function invalidate(){ S.plans = {solo:null, team:null}; }
