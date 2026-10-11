@@ -236,6 +236,10 @@ details.method code{background:var(--paper);padding:1px 5px;border-radius:4px}
   .db td.delcell .x{min-width:40px;min-height:40px;font-size:1.4rem}
   .db td.num{font-size:1.05rem;align-self:end}
 }
+/* 拍照辨識 */
+.photo-box{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin:6px 0 12px;background:var(--paper)}
+.btn.disabled{opacity:.5;pointer-events:none}
+.field input.chk{border-color:var(--warn);background:var(--warn-soft);box-shadow:0 0 0 2px var(--warn-soft)}
 /* 手機版修正（放在樣式表最後，避免被前面的規則蓋掉） */
 .grid > *{min-width:0}
 .mem{table-layout:fixed}
@@ -1076,20 +1080,167 @@ document.addEventListener('click', e => {
 });
 
 /* ---------- 在網頁新增食物，寫進試算表（需通關碼；只能新增） ---------- */
-const DBF = {open:false, busy:false, err:'', id:'', v:{}};
+const DBF = {open:false, busy:false, err:'', id:'', v:{}, ocr:{busy:false, msg:'', raw:'', filled:[], flags:[]}};
+/* ---------- 拍照辨識營養標示（免費，在手機瀏覽器內完成） ----------
+ 辨識引擎 Tesseract.js 第一次使用時才下載；照片不會離開手機。
+ 準確度有限：一律只「填入表單並標黃色」，由人核對後才儲存。 */
+const OCR_JS = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+const OCR_LANG_PATH = 'https://tessdata.projectnaptha.com/4.0.0_fast';
+
+/* 把辨識出的文字整理成「每一個單位（整包／整個）」的數字。純函式，可單獨測試。 */
+function parseLabel(raw){
+  const flags = [];
+  const norm = String(raw || '')
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 65248))
+    .replace(/[：﹕]/g, ':').replace(/(?<=\d)[,，。](?=\d)/g, '.')
+    .replace(/(?<=\d\.?)[oO](?![A-Za-z])|(?<![A-Za-z])[oO](?=\d)/g, '0')
+    .replace(/(?<=\d\.?)[lI](?![A-Za-z])|(?<![A-Za-z])[lI](?=\d)/g, '1')
+    .replace(/(?<=\d) (?=\.\d)|(?<=\d\.) (?=\d)/g, '');
+  const lines = norm.split(/\n/).map(l => l.replace(/[ \t　]+/g, ' ').trim()).filter(Boolean);
+  const numsAfter = (line, m) => [...line.slice(m.index + m[0].length).matchAll(/(\d+(?:\.\d+)?)/g)].map(x => parseFloat(x[1]));
+  const find = (re, skip) => {
+    for(const l of lines){
+      if(skip && skip.test(l)) continue;
+      const m = l.match(re); if(!m) continue;
+      const n = numsAfter(l, m); if(n.length) return n;
+    }
+    return null;
+  };
+
+  // 每份重量、本包裝含幾份
+  let servingG = null, servings = null;
+  for(const l of lines){
+    const m = l.match(/每\s*(?:一\s*)?份(?:量)?\s*:?\s*(\d+(?:\.\d+)?)\s*(公克|克|g|G|毫升|ml|mL|公升)/);
+    if(m){ servingG = parseFloat(m[1]); break; }
+  }
+  for(const l of lines){
+    const m = l.match(/本\s*包\s*裝\s*(?:含|內含|内含)?\s*:?\s*(\d+(?:\.\d+)?)\s*份/) || l.match(/(?:共|含)\s*(\d+(?:\.\d+)?)\s*份/);
+    if(m){ servings = parseFloat(m[1]); break; }
+  }
+  // 欄位順序：預設第一欄是「每份」、第二欄是「每 100 公克」；若標題列反過來就交換
+  let col = 0, per100Only = false;
+  const head = lines.find(l => /每\s*份/.test(l) && /每\s*100/.test(l));
+  if(head){ if(head.search(/每\s*100/) < head.search(/每\s*份/)) col = 1; }
+  else if(lines.some(l => /每\s*100/.test(l)) && servingG === null) per100Only = true;
+
+  const pick = arr => arr ? (arr[col] !== undefined ? arr[col] : arr[0]) : null;
+  const kcal = pick(find(/熱\s*量/));
+  const protein = pick(find(/蛋\s*白\s*質/));
+  const fat = pick(find(/(?:總\s*)?脂\s*肪/, /飽和|反式|不飽和/));
+  const carb = pick(find(/碳\s*水(?:\s*化\s*合\s*物)?/));
+
+  if(servings === null){ servings = 1; if(!per100Only) flags.push('沒讀到「本包裝含幾份」，先當作 1 份。請對照包裝確認份數'); }
+  if(servingG === null && !per100Only) flags.push('沒讀到每份重量，請自己填「每單位重量」');
+  const k = servings;
+  const scale = v => v === null ? null : Math.round(v * k * 10) / 10;
+  const out = {servings:k, servingG,
+    g: servingG !== null ? scale(servingG) : (per100Only ? 100 : null),
+    kcal: kcal === null ? null : Math.round(kcal * k), carb: scale(carb), protein: scale(protein), fat: scale(fat),
+    per100Only, flags};
+  if(per100Only) flags.push('只讀到「每 100 公克」的數字，已先照 100 公克填入。請把重量改成包裝上的實際重量，熱量與營養素也要依比例調整');
+  if(out.kcal === null) flags.push('沒讀到熱量');
+  if([out.carb, out.protein, out.fat].some(v => v === null)) flags.push('碳水、蛋白質、脂肪有沒讀到的，可留空或手動補');
+  if(out.kcal !== null && out.carb !== null && out.protein !== null && out.fat !== null){
+    const est = out.carb * 4 + out.protein * 4 + out.fat * 9;
+    if(out.kcal > 0 && Math.abs(est - out.kcal) / out.kcal > 0.3) flags.push('三大營養素換算的熱量和標示熱量差很多，有數字可能辨識錯了');
+  }
+  if(out.kcal !== null && out.g && out.kcal / out.g > 9.5) flags.push('熱量和重量對不起來（每公克超過 9.5 大卡），請核對');
+  return out;
+}
+
+/* 載入辨識引擎（只載一次） */
+let ocrLib = null;
+function loadOcrLib(){
+  if(window.Tesseract) return Promise.resolve();
+  if(ocrLib) return ocrLib;
+  ocrLib = new Promise((res, rej) => {
+    const sc = document.createElement('script'); sc.src = OCR_JS; sc.crossOrigin = 'anonymous';
+    sc.onload = () => res(); sc.onerror = () => { ocrLib = null; rej(new Error('辨識引擎下載失敗，請確認網路後再試')); };
+    document.head.appendChild(sc);
+  });
+  return ocrLib;
+}
+
+/* 縮放並加強對比，讓文字更清楚 */
+function prepImage(file){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const maxW = 2000, minW = 1300;
+      let w = img.naturalWidth, h = img.naturalHeight, sc = 1;
+      if(w > maxW) sc = maxW / w; else if(w < minW) sc = minW / w;
+      w = Math.round(w * sc); h = Math.round(h * sc);
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, w, h);
+      const d = cx.getImageData(0, 0, w, h), px = d.data; let lo = 255, hi = 0;
+      for(let i = 0; i < px.length; i += 4){ const g = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000; px[i] = g; if(g < lo) lo = g; if(g > hi) hi = g; }
+      const span = Math.max(40, hi - lo);
+      for(let i = 0; i < px.length; i += 4){ const v = Math.max(0, Math.min(255, (px[i] - lo) * 255 / span)); px[i] = px[i + 1] = px[i + 2] = v; }
+      cx.putImageData(d, 0, 0); URL.revokeObjectURL(url); res(cv);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('這張照片打不開，請換一張')); };
+    img.src = url;
+  });
+}
+
+async function ocrPhoto(file){
+  if(!file || DBF.ocr.busy) return;
+  const set = (msg) => { DBF.ocr.msg = msg; const el = document.getElementById('ocr-status'); if(el) el.textContent = msg; };
+  DBF.ocr = {busy:true, msg:'準備中…', raw:'', filled:[], flags:[]};
+  render();
+  let worker = null;
+  try{
+    set('下載辨識引擎…（第一次約需數十秒，之後會快很多）');
+    await loadOcrLib();
+    set('處理照片…');
+    const cv = await prepImage(file);
+    set('載入中文辨識資料…（第一次較久）');
+    worker = await Tesseract.createWorker(['chi_tra', 'eng'], 1, {
+      langPath: OCR_LANG_PATH,
+      logger: m => { if(m.status === 'recognizing text') set(`辨識中… ${Math.round((m.progress || 0) * 100)}%`); }
+    });
+    await worker.setParameters({tessedit_pageseg_mode:'6', preserve_interword_spaces:'1'});
+    const r = await worker.recognize(cv);
+    const text = r.data.text || '';
+    const p = parseLabel(text);
+    const filled = [];
+    const put = (k, v) => { if(v !== null && v !== undefined && isFinite(v)){ DBF.v[k] = String(v); filled.push(k); } };
+    put('g', p.g); put('kcal', p.kcal); put('carb', p.carb); put('protein', p.protein); put('fat', p.fat);
+    DBF.ocr = {busy:false, msg: filled.length ? '辨識完成：已填入黃色欄位，請對照包裝核對後再儲存。' : '沒有辨識出營養標示，請把標示拍清楚、平整、光線充足後再試，或直接手動填寫。',
+      raw:text, filled, flags:p.flags};
+  }catch(e){
+    DBF.ocr = {busy:false, msg:'辨識失敗：' + (e.message || e), raw:'', filled:[], flags:[]};
+  }
+  if(worker){ try{ await worker.terminate(); }catch(e){} }
+  render();
+}
+
 const NF_BLANK = () => ({name:'', unit:'包', g:'', kcal:'', water:0, shelf:180, price:'', store:'超商', slots:['t'],
   main:false, scope:'both', max:2, carb:'', protein:'', fat:'', key:''});
 
 function renderFoodForm(){
   if(!DBF.open) return '';
   const v = DBF.v;
-  const inp = (k, label, type, extra) => `<div class="field"><label for="nf-${k}">${label}</label>
-    <input id="nf-${k}" type="${type}" data-nf="${k}" value="${esc(v[k])}" ${extra || ''}></div>`;
+  const chk = k => DBF.ocr.filled.includes(k) ? 'chk' : '';
+  const inp = (k, label, type, extra) => `<div class="field"><label for="nf-${k}">${label}${chk(k) ? ' <small style="color:var(--warn)">請核對</small>' : ''}</label>
+    <input id="nf-${k}" class="${chk(k)}" type="${type}" data-nf="${k}" value="${esc(v[k])}" ${extra || ''}></div>`;
+  const o = DBF.ocr;
+  const photo = `<div class="photo-box">
+    <b>📷 拍照辨識營養標示</b>
+    <p class="hint">拍包裝背面的「營養標示」表格，會自動填入重量、熱量、碳水、蛋白質、脂肪。免費、照片不會離開手機，但辨識不一定準，填入的欄位會標黃色，請對照包裝核對。名稱、單位要自己填。</p>
+    <p style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0">
+      <label class="btn ${o.busy ? 'disabled' : ''}">拍照<input type="file" accept="image/*" capture="environment" data-nf-photo hidden ${o.busy ? 'disabled' : ''}></label>
+      <label class="btn ${o.busy ? 'disabled' : ''}">選相片<input type="file" accept="image/*" data-nf-photo hidden ${o.busy ? 'disabled' : ''}></label></p>
+    <p class="hint" id="ocr-status" role="status">${esc(o.msg)}</p>
+    ${o.flags.length ? `<ul class="hint warn" style="margin:4px 0 4px 18px;padding:0">${o.flags.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+    ${o.raw ? `<details><summary class="hint">看辨識出的原始文字</summary><pre style="white-space:pre-wrap;font-size:.8rem;margin:4px 0">${esc(o.raw)}</pre></details>` : ''}
+  </div>`;
   const sel = (k, label, opts) => `<div class="field"><label for="nf-${k}">${label}</label><select id="nf-${k}" data-nf="${k}">
     ${opts.map(([val, t]) => `<option value="${esc(val)}" ${v[k] === val ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
   return `<div class="panel" id="foodform" style="margin-bottom:14px">
     <h3 style="margin:0 0 4px">新增食物</h3>
     <p class="hint">按「儲存到試算表」後會寫進試算表 foods，所有裝置重新整理就看得到。這裡只能新增，要修改或刪除請到試算表。數字請照包裝標示填。</p>
+    ${photo}
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:0">
       ${inp('name', '名稱（不用寫單位）', 'text', 'maxlength="40" placeholder="例：能量膠"')}
       ${inp('unit', '單位（每份是一…）', 'text', 'maxlength="6" placeholder="包、個、條、罐"')}
@@ -1152,6 +1303,10 @@ async function foodFormSave(){
   DBF.busy = false; render();
 }
 
+document.addEventListener('change', e => {
+  const el = e.target;
+  if(el.matches && el.matches('input[data-nf-photo]') && el.files && el.files[0]){ const f = el.files[0]; el.value = ''; ocrPhoto(f); }
+});
 document.addEventListener('input', e => {
   const el = e.target;
   if(el.dataset.nf) DBF.v[el.dataset.nf] = el.type === 'checkbox' ? el.checked : el.value;
@@ -1228,7 +1383,7 @@ document.addEventListener('click', e => {
   }
   else if(a === 'delFood'){ const f = S.foods[+el.dataset.i]; if(confirm(`刪除「${f.name}」？`)){ S.foods.splice(+el.dataset.i, 1); S.foodsEdited = true; invalidate(); save(); render(); } }
   else if(a === 'addFood' && SHEET_API){
-    DBF.open = true; DBF.v = NF_BLANK(); DBF.id = 'u' + Date.now().toString(36); DBF.err = ''; render();
+    DBF.open = true; DBF.v = NF_BLANK(); DBF.id = 'u' + Date.now().toString(36); DBF.err = ''; DBF.ocr = {busy:false, msg:'', raw:'', filled:[], flags:[]}; render();
     const n = document.getElementById('nf-name'); if(n){ n.scrollIntoView({block:'center'}); n.focus(); }
   }
   else if(a === 'addFood'){
