@@ -775,6 +775,7 @@ function renderDB(){
   return `<div class="block-h"><h2>食物資料庫</h2>
     <div class="acts"><button class="btn" data-act="addFood">新增食物</button><button class="btn" data-act="toggleNutri">${S.hideNutri ? '顯示營養素' : '隱藏營養素'}</button>${SHEET_API ? '<button class="btn" data-act="reloadCloud">從試算表重新載入</button>' : ''}<button class="btn" data-act="resetFoods">${SHEET_API ? '放棄修改' : '恢復預設'}</button></div></div>
   ${cloudNote()}
+  ${renderFoodForm()}
   <p class="hint">取消勾選的食物不會被自動配入。點選早／晚／行切換可用的餐別。數值是一般市售品的估計，請依實際包裝修正。</p>
   <div class="dbwrap"><table class="db"><thead><tr>
     <th>使用</th><th>名稱</th><th>單位</th><th>重量 g</th><th>熱量 kcal</th>${S.hideNutri ? '' : '<th>碳水 g</th><th>蛋白質 g</th><th>脂肪 g</th>'}<th>kcal/g</th><th>需水 ml</th><th>可放天數</th><th>價格</th><th>購買</th><th>餐別</th><th>主食</th><th>適用</th><th></th></tr></thead>
@@ -992,6 +993,98 @@ document.addEventListener('click', e => {
   else if(a === 'stockSaveEdit') stockSaveEdit(el.dataset.id);
 });
 
+/* ---------- 在網頁新增食物，寫進試算表（需通關碼；只能新增） ---------- */
+const DBF = {open:false, busy:false, err:'', id:'', v:{}};
+const NF_BLANK = () => ({name:'', unit:'包', g:'', kcal:'', water:0, shelf:180, price:'', store:'超商', slots:['t'],
+  main:false, scope:'both', max:2, carb:'', protein:'', fat:'', key:''});
+
+function renderFoodForm(){
+  if(!DBF.open) return '';
+  const v = DBF.v;
+  const inp = (k, label, type, extra) => `<div class="field"><label for="nf-${k}">${label}</label>
+    <input id="nf-${k}" type="${type}" data-nf="${k}" value="${esc(v[k])}" ${extra || ''}></div>`;
+  const sel = (k, label, opts) => `<div class="field"><label for="nf-${k}">${label}</label><select id="nf-${k}" data-nf="${k}">
+    ${opts.map(([val, t]) => `<option value="${esc(val)}" ${v[k] === val ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>`;
+  return `<div class="panel" id="foodform" style="margin-bottom:14px">
+    <h3 style="margin:0 0 4px">新增食物</h3>
+    <p class="hint">按「儲存到試算表」後會寫進試算表 foods，所有裝置重新整理就看得到。這裡只能新增，要修改或刪除請到試算表。數字請照包裝標示填。</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:0">
+      ${inp('name', '名稱（不用寫單位）', 'text', 'maxlength="40" placeholder="例：能量膠"')}
+      ${inp('unit', '單位（每份是一…）', 'text', 'maxlength="6" placeholder="包、個、條、罐"')}
+      ${inp('g', '每單位重量 g', 'number', 'min="0" step="any"')}
+      ${inp('kcal', '每單位熱量 kcal', 'number', 'min="0" step="any"')}
+      ${inp('water', '需加水 ml（不用就 0）', 'number', 'min="0" step="any"')}
+      ${inp('shelf', '可放幾天', 'number', 'min="1" step="1"')}
+      ${inp('price', '參考價格 元', 'number', 'min="0" step="any"')}
+      ${sel('store', '在哪買', STORES.map(s => [s, s]))}
+      ${sel('scope', '適用', [['both', '個人、整隊都可'], ['solo', '只給個人'], ['team', '只給整隊公糧']])}
+      ${inp('max', '個人每餐最多幾' + esc(v.unit || '份'), 'number', 'min="1" step="1"')}
+      ${inp('carb', '碳水 g（選填）', 'number', 'min="0" step="any"')}
+      ${inp('protein', '蛋白質 g（選填）', 'number', 'min="0" step="any"')}
+      ${inp('fat', '脂肪 g（選填）', 'number', 'min="0" step="any"')}
+    </div>
+    <p style="margin:10px 0 4px"><b>適合哪一餐</b>　${['b', 'd', 't'].map(k => `<label class="check" style="display:inline-flex;margin-right:12px"><input type="checkbox" data-nf-slot="${k}" ${v.slots.includes(k) ? 'checked' : ''}>${SLOTN[k]}</label>`).join('')}
+      <label class="check" style="display:inline-flex"><input type="checkbox" data-nf="main" ${v.main ? 'checked' : ''}>是主食（每餐會先選一樣主食）</label></p>
+    ${STK.key ? '' : `<div class="field" style="max-width:220px"><label for="nf-key">通關碼</label><input id="nf-key" type="password" autocomplete="off" data-nf="key" value="${esc(v.key)}"></div>`}
+    ${DBF.err ? `<p class="hint warn">${esc(DBF.err)}</p>` : ''}
+    <p><button class="btn primary" data-act="foodFormSave" ${DBF.busy ? 'disabled' : ''}>${DBF.busy ? '儲存中…' : '儲存到試算表'}</button>
+    <button class="btn" data-act="foodFormCancel">取消</button></p></div>`;
+}
+
+function cacheAddFood(nf){
+  try{
+    const o = JSON.parse(localStorage.getItem(LS_CLOUD) || 'null');
+    if(o && Array.isArray(o.foods) && !o.foods.some(f => f.id === nf.id)){
+      o.foods.push(nf); localStorage.setItem(LS_CLOUD, JSON.stringify(o));
+    }
+  }catch(e){}
+}
+
+async function foodFormSave(){
+  if(DBF.busy) return;
+  const v = DBF.v;
+  const food = {id:DBF.id, name:String(v.name).trim(), unit:String(v.unit).trim(), g:v.g, kcal:v.kcal, water:v.water === '' ? 0 : v.water,
+    shelf:v.shelf, price:v.price === '' ? 0 : v.price, store:v.store, slots:v.slots, main:!!v.main, scope:v.scope, max:v.max,
+    carb_g:v.carb, protein_g:v.protein, fat_g:v.fat};
+  const miss = !food.name ? '名稱' : !food.unit ? '單位' : !(+food.g > 0) ? '每單位重量' : !(+food.kcal > 0) ? '每單位熱量' : !food.slots.length ? '適合哪一餐' : '';
+  if(miss){ DBF.err = `請填寫：${miss}`; render(); return; }
+  if(+food.kcal / +food.g > 9.5){ DBF.err = '熱量和重量好像填反了（每公克超過 9.5 大卡）'; render(); return; }
+  if(S.foods.some(f => f.name === food.name) && !confirm(`食物資料庫已經有「${food.name}」，還要再新增一筆嗎？`)) return;
+  if(!STK.key){
+    if(!String(v.key).trim()){ DBF.err = '請輸入通關碼'; render(); return; }
+    STK.key = String(v.key).trim();
+  }
+  DBF.busy = true; DBF.err = ''; render();
+  try{
+    const r = await apiPost({action:'addFood', food});
+    try{ localStorage.setItem(LS_KEY, STK.key); }catch(e){}
+    const nf = normFood(r.food);
+    if(nf){
+      if(!BASE_FOODS.some(f => f.id === nf.id)) BASE_FOODS = BASE_FOODS.concat([nf]);
+      if(!S.foods.some(f => f.id === nf.id)) S.foods.push(JSON.parse(JSON.stringify(nf)));
+      cacheAddFood(nf);
+    }
+    DBF.open = false; invalidate(); save();
+    toast(r.skipped && r.skipped.length ? '已新增；試算表缺少營養素欄位，營養素沒存到' : '已新增到試算表');
+  }catch(e){ DBF.err = e.message; }
+  DBF.busy = false; render();
+}
+
+document.addEventListener('input', e => {
+  const el = e.target;
+  if(el.dataset.nf) DBF.v[el.dataset.nf] = el.type === 'checkbox' ? el.checked : el.value;
+  else if(el.dataset.nfSlot){
+    const k = el.dataset.nfSlot, s = DBF.v.slots;
+    DBF.v.slots = el.checked ? s.concat(k).filter((x, i, a) => a.indexOf(x) === i) : s.filter(x => x !== k);
+  }
+});
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if(!el) return;
+  const a = el.dataset.act;
+  if(a === 'foodFormSave') foodFormSave();
+  else if(a === 'foodFormCancel'){ DBF.open = false; DBF.err = ''; render(); }
+});
+
 /* ---------- 事件 ---------- */
 function invalidate(){ S.plans = {solo:null, team:null}; }
 function toast(t){ const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 1800); }
@@ -1051,6 +1144,10 @@ document.addEventListener('click', e => {
     S.foodsEdited = true; invalidate(); save(); render();
   }
   else if(a === 'delFood'){ const f = S.foods[+el.dataset.i]; if(confirm(`刪除「${f.name}」？`)){ S.foods.splice(+el.dataset.i, 1); S.foodsEdited = true; invalidate(); save(); render(); } }
+  else if(a === 'addFood' && SHEET_API){
+    DBF.open = true; DBF.v = NF_BLANK(); DBF.id = 'u' + Date.now().toString(36); DBF.err = ''; render();
+    const n = document.getElementById('nf-name'); if(n){ n.scrollIntoView({block:'center'}); n.focus(); }
+  }
   else if(a === 'addFood'){
     S.foods.push({id:'u' + Date.now().toString(36), name:'新食物', unit:'個', g:50, kcal:200, water:0, shelf:30, price:30, store:'超商', slots:['t'], main:false, scope:'both', max:2});
     S.foodsEdited = true; invalidate(); save(); render();
