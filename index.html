@@ -31,6 +31,13 @@
   --signal:#F07A45; --signal-soft:#4A2A1C; --water:#72A9D6; --water-soft:#1E3243;
   --moss:#8DB590; --moss-soft:#22342A; --warn:#E0A84A; --warn-soft:#3E3018; color-scheme:dark;
 }
+/* 白天高對比：強光下好讀。放在深色規則之後，才能蓋過系統深色模式 */
+:root[data-theme="day"]{
+  --paper:#FFFFFF; --card:#FFFFFF; --ink:#000000; --muted:#33403B; --line:#4F5B56;
+  --head:#0B2A22; --head-ink:#FFFFFF;
+  --signal:#982D00; --signal-soft:#FFE2D3; --water:#00478A; --water-soft:#D9EAFA;
+  --moss:#1B5527; --moss-soft:#D6EEDA; --warn:#6E4300; --warn-soft:#FFEDBA; color-scheme:light;
+}
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--paper);color:var(--ink);
@@ -192,6 +199,43 @@ details.method code{background:var(--paper);padding:1px 5px;border-radius:4px}
   body{background:#fff;color:#000;font-size:12px}
   .day,.shop,.hero,.stat{break-inside:avoid}
 }
+/* 高對比細部：加粗字重、去掉裝飾線條、邊框與焦點更明顯 */
+:root[data-theme="day"] body{font-weight:500}
+:root[data-theme="day"] header svg.topo{display:none}
+:root[data-theme="day"] nav.tabs button{opacity:1}
+:root[data-theme="day"] :focus-visible{outline:3px solid #000;outline-offset:2px}
+:root[data-theme="day"] .panel,:root[data-theme="day"] .stat,:root[data-theme="day"] .day,:root[data-theme="day"] .slot,
+:root[data-theme="day"] .dbwrap,:root[data-theme="day"] .btn,:root[data-theme="day"] input,:root[data-theme="day"] select,
+:root[data-theme="day"] details.method{border-width:1.5px}
+:root[data-theme="day"] .gauge{outline:1px solid var(--line)}
+.theme-btn{position:absolute;top:12px;right:18px;z-index:2;background:rgba(255,255,255,.14);color:var(--head-ink);
+  border:1px solid rgba(255,255,255,.55);border-radius:999px;padding:6px 12px;font-size:.82rem;font-weight:700;cursor:pointer}
+:root[data-theme="day"] .theme-btn{background:#fff;color:#000;border:2px solid #fff}
+/* 食物資料庫：手機改成一種食物一張卡片 */
+@media (max-width:700px){
+  .dbwrap{border:0;max-height:none;overflow:visible;background:transparent;border-radius:0}
+  .db,.db tbody{display:block;background:transparent}
+  .db thead{display:none}
+  .db tr{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;padding:12px 12px 14px;margin-bottom:12px}
+  .db tr.off{opacity:.6}
+  .db tr.off td{opacity:1}
+  .db td{display:block;border:0;padding:0;white-space:normal;min-width:0}
+  .db td::before{content:attr(data-l);display:block;font-size:.74rem;color:var(--muted);margin-bottom:3px}
+  .db td[data-l=""]::before{display:none}
+  .db td input[type=number],.db td input[type=text],.db td select{width:100%!important;min-height:42px;font-size:1rem;padding:6px 8px}
+  .db td[data-l="使用"]{grid-column:1/-1;order:-3;display:flex;align-items:center;gap:8px;padding-right:44px}
+  .db td[data-l="使用"]::before{margin:0;order:2;font-size:.9rem}
+  .db td[data-l="名稱"]{grid-column:1/-1;order:-2}
+  .db td[data-l="適合哪一餐"]{grid-column:1/-1}
+  .db td[data-l="適合哪一餐"] .chip{padding:8px 18px;font-size:.95rem;margin-right:8px;border-radius:999px}
+  .db td[data-l="主食"]{display:flex;align-items:center;gap:8px}
+  .db td[data-l="主食"]::before{margin:0;order:2;font-size:.9rem}
+  .db td input[type=checkbox]{width:24px;height:24px;accent-color:var(--signal)}
+  .db td.delcell{position:absolute;top:6px;right:6px}
+  .db td.delcell .x{min-width:40px;min-height:40px;font-size:1.4rem}
+  .db td.num{font-size:1.05rem;align-self:end}
+}
 /* 手機版修正（放在樣式表最後，避免被前面的規則蓋掉） */
 .grid > *{min-width:0}
 .mem{table-layout:fixed}
@@ -222,6 +266,7 @@ details.method code{background:var(--paper);padding:1px 5px;border-radius:4px}
     </g>
   </svg>
   <div class="wrap head-in">
+    <button class="theme-btn" data-act="theme" aria-pressed="false" aria-label="切換白天高對比模式"></button>
     <h1>登山糧食規劃</h1>
     <p class="lede">依體重、背負重量與天數估算每日熱量，配出超商、超市買得到的早晚餐與行動糧，並估算飲水、燃料與採購清單。</p>
     <nav class="tabs" role="tablist">
@@ -237,6 +282,17 @@ details.method code{background:var(--paper);padding:1px 5px;border-radius:4px}
 <div class="toast" id="toast" role="status"></div>
 
 <script>
+/* ---------- 顯示模式：自動（跟隨手機）／白天高對比 ---------- */
+const LS_THEME = 'hikefood-theme-v1';
+function applyTheme(t){
+  const root = document.documentElement;
+  if(t === 'day') root.setAttribute('data-theme', 'day'); else root.removeAttribute('data-theme');
+  const b = document.querySelector('.theme-btn');
+  if(b){ b.textContent = t === 'day' ? '☀ 白天高對比：開' : '☀ 白天高對比'; b.setAttribute('aria-pressed', t === 'day' ? 'true' : 'false'); }
+}
+let THEME = 'auto';
+try{ THEME = localStorage.getItem(LS_THEME) === 'day' ? 'day' : 'auto'; }catch(e){}
+applyTheme(THEME);
 /* ---------- 食物資料 ----------
  slots: b 早餐 / d 晚餐 / t 行動糧
  scope: solo 個人用、team 團體煮食用、both 兩者皆可
@@ -806,21 +862,21 @@ function renderDB(){
   <div class="dbwrap"><table class="db"><thead><tr>
     <th>使用</th><th>名稱</th><th>單位</th><th>重量 g</th><th>熱量 kcal</th>${S.hideNutri ? '' : '<th>碳水 g</th><th>蛋白質 g</th><th>脂肪 g</th>'}<th>kcal/g</th><th>需水 ml</th><th>可放天數</th><th>價格</th><th>購買</th><th>餐別</th><th>主食</th><th>適用</th><th></th></tr></thead>
   <tbody>${S.foods.map((f, i) => `<tr class="${f.on === false ? 'off' : ''}">
-    <td><input type="checkbox" data-f="${i}.on" ${f.on === false ? '' : 'checked'} aria-label="使用 ${esc(f.name)}"></td>
-    <td><input type="text" data-f="${i}.name" value="${esc(f.name)}"></td>
-    <td><input type="text" data-f="${i}.unit" value="${esc(f.unit)}" style="width:40px"></td>
-    <td><input type="number" data-f="${i}.g" value="${f.g}"></td>
-    <td><input type="number" data-f="${i}.kcal" value="${f.kcal}"></td>
-    ${S.hideNutri ? '' : ['carb','protein','fat'].map(k => `<td><input type="number" min="0" step="0.1" data-f="${i}.${k}" value="${f[k] == null ? '' : f[k]}" placeholder="—" style="width:56px" aria-label="${k}"></td>`).join('')}
-    <td class="num">${(f.kcal / f.g).toFixed(1)}</td>
-    <td><input type="number" data-f="${i}.water" value="${f.water}"></td>
-    <td><input type="number" data-f="${i}.shelf" value="${f.shelf}"></td>
-    <td><input type="number" data-f="${i}.price" value="${f.price}"></td>
-    <td><select data-f="${i}.store">${STORES.map(s => `<option ${f.store === s ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
-    <td>${['b','d','t'].map(s => `<span class="chip ${s} ${f.slots.includes(s) ? 'on' : ''}" data-act="slotChip" data-i="${i}" data-s="${s}" role="button" tabindex="0">${{b:'早',d:'晚',t:'行'}[s]}</span>`).join('')}</td>
-    <td><input type="checkbox" data-f="${i}.main" ${f.main ? 'checked' : ''} aria-label="主食"></td>
-    <td><select data-f="${i}.scope">${Object.entries({both:'皆可',solo:'個人',team:'整隊'}).map(([v, t]) => `<option value="${v}" ${f.scope === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
-    <td><button class="x" data-act="delFood" data-i="${i}" aria-label="刪除 ${esc(f.name)}">×</button></td>
+    <td data-l="使用"><input type="checkbox" data-f="${i}.on" ${f.on === false ? '' : 'checked'} aria-label="使用 ${esc(f.name)}"></td>
+    <td data-l="名稱"><input type="text" data-f="${i}.name" value="${esc(f.name)}"></td>
+    <td data-l="單位"><input type="text" data-f="${i}.unit" value="${esc(f.unit)}" style="width:40px"></td>
+    <td data-l="重量 g"><input type="number" data-f="${i}.g" value="${f.g}"></td>
+    <td data-l="熱量 kcal"><input type="number" data-f="${i}.kcal" value="${f.kcal}"></td>
+    ${S.hideNutri ? '' : ['carb','protein','fat'].map(k => `<td data-l="${{carb:'碳水 g',protein:'蛋白質 g',fat:'脂肪 g'}[k]}"><input type="number" min="0" step="0.1" data-f="${i}.${k}" value="${f[k] == null ? '' : f[k]}" placeholder="—" style="width:56px" aria-label="${k}"></td>`).join('')}
+    <td class="num" data-l="每公克熱量 kcal/g">${(f.kcal / f.g).toFixed(1)}</td>
+    <td data-l="需水 ml"><input type="number" data-f="${i}.water" value="${f.water}"></td>
+    <td data-l="可放天數"><input type="number" data-f="${i}.shelf" value="${f.shelf}"></td>
+    <td data-l="價格 元"><input type="number" data-f="${i}.price" value="${f.price}"></td>
+    <td data-l="在哪買"><select data-f="${i}.store">${STORES.map(s => `<option ${f.store === s ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
+    <td data-l="適合哪一餐">${['b','d','t'].map(s => `<span class="chip ${s} ${f.slots.includes(s) ? 'on' : ''}" data-act="slotChip" data-i="${i}" data-s="${s}" role="button" tabindex="0">${{b:'早',d:'晚',t:'行'}[s]}</span>`).join('')}</td>
+    <td data-l="主食"><input type="checkbox" data-f="${i}.main" ${f.main ? 'checked' : ''} aria-label="主食"></td>
+    <td data-l="適用"><select data-f="${i}.scope">${Object.entries({both:'皆可',solo:'個人',team:'整隊'}).map(([v, t]) => `<option value="${v}" ${f.scope === v ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
+    <td data-l="" class="delcell"><button class="x" data-act="delFood" data-i="${i}" aria-label="刪除 ${esc(f.name)}">×</button></td>
   </tr>`).join('')}</tbody></table></div>`;
 }
 
@@ -1152,7 +1208,8 @@ document.addEventListener('change', e => {
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if(!el) return;
   const a = el.dataset.act;
-  if(a === 'view'){ S.view = el.dataset.v; save(); render(); }
+  if(a === 'theme'){ THEME = THEME === 'day' ? 'auto' : 'day'; try{ localStorage.setItem(LS_THEME, THEME); }catch(e){} applyTheme(THEME); }
+  else if(a === 'view'){ S.view = el.dataset.v; save(); render(); }
   else if(a === 'inc' || a === 'dec'){
     const sl = getPlan(S.view).days[el.dataset.d].slots[el.dataset.s], id = el.dataset.id;
     sl.items[id] = Math.max(0, (sl.items[id] || 0) + (a === 'inc' ? 1 : -1));
