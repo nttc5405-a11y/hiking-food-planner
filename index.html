@@ -192,6 +192,20 @@ details.method code{background:var(--paper);padding:1px 5px;border-radius:4px}
   body{background:#fff;color:#000;font-size:12px}
   .day,.shop,.hero,.stat{break-inside:avoid}
 }
+/* 手機版修正（放在樣式表最後，避免被前面的規則蓋掉） */
+.grid > *{min-width:0}
+.mem{table-layout:fixed}
+.mem th:nth-child(1),.mem td:nth-child(1){width:38%}
+.mem th:nth-child(2),.mem td:nth-child(2),.mem th:nth-child(3),.mem td:nth-child(3){width:25%}
+.mem th:nth-child(4),.mem td:nth-child(4){width:12%}
+.mem input{min-width:0}
+@media (max-width:600px){
+  .step{width:36px;height:36px;font-size:1.1rem}
+  .items li{padding:4px 0}
+  .chip{padding:4px 10px}
+  .btn.sm{padding:7px 12px}
+  .x{min-width:34px;min-height:34px}
+}
 </style>
 </head>
 <body>
